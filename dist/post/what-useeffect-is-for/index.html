@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What useEffect Is Actually For · Four Depths</title>
+<meta name="description" content="A blog that lets you choose how deep you read: one sentence, one paragraph, three paragraphs, one page, three pages.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2213%22 font-size=%2214%22>◐</text></svg>">
+<script>
+  
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site">
+  <a class="wordmark" href="/">Four&nbsp;Depths</a>
+  <button id="theme" class="theme" type="button" aria-label="Change the theme">
+    <span class="dot" aria-hidden="true"></span><span class="theme-name">auto</span>
+  </button>
+</header>
+
+<main>
+
+<article class="post" id="post">
+  <p class="crumb"><a href="/">← all posts</a></p>
+  <h1>What useEffect Is Actually For</h1>
+  
+  <p class="meta">
+    
+    
+    <span class="tag">code</span>
+    <span>18 Aug 2026</span>
+    
+  </p>
+  
+
+  
+  <div class="depth" id="depth">
+    <div class="depth-row">
+      <button class="step" id="shorter" type="button" aria-label="A shorter depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
+      </button>
+      <input id="range" class="range" type="range" min="0" max="4" step="any" value="0"
+             aria-label="Reading depth" list="stops">
+      <button class="step" id="longer" type="button" aria-label="A longer depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
+      </button>
+      <datalist id="stops"><option value="0" label="Sentence" data-w="31" data-r="0.2 min"></option><option value="1" label="Paragraph" data-w="108" data-r="0.7 min"></option><option value="2" label="Short" data-w="251" data-r="1.5 min"></option><option value="3" label="Medium" data-w="447" data-r="2.7 min"></option><option value="4" label="Long" data-w="1040" data-r="6.3 min"></option></datalist>
+    </div>
+    <p class="now"><span id="now"><span class="lbl">Sentence</span><span class="wc">31 words · 0.2 min</span></span></p>
+  </div>
+  
+
+  <div class="levels" id="levels">
+    
+    <section class="level is-active" data-i="0" data-k="sentence"
+             aria-label="Sentence" aria-hidden="false"><p><code>useEffect</code> is not a lifecycle hook: it keeps something <em>outside</em> React in sync with the state inside it, and most effects in a typical codebase should not be effects at all.</p>
+</section>
+    
+    <section class="level" data-i="1" data-k="paragraph"
+             aria-label="Paragraph" aria-hidden="true" hidden><p>The mental model most people carry is <em>“run this after render, when these values change”</em>. That is close enough to survive a tutorial and wrong enough to cause every hard bug later. The dependency array is not a trigger list; it is a <strong>claim</strong> that the effect depends on exactly these values and nothing else. React may run your effect more often than you expect — twice on mount in development, again after a fast refresh — and correct code must survive that. Reach for an effect only when you are synchronising with something React does not control. If a user did it, it belongs in the handler.</p>
+</section>
+    
+    <section class="level" data-i="2" data-k="paragraphs"
+             aria-label="Short" aria-hidden="true" hidden><p>Start with what an effect actually is. After React commits a render to the DOM and the browser paints, it runs your passive effects. Each effect can return a cleanup function. Before running the effect again — and when the component unmounts — React runs that cleanup. So the real unit is not &ldquo;on mount&rdquo; and &ldquo;on unmount&rdquo;; it is a pair, <em>set up</em> and <em>tear down</em>, that can happen many times in a component&rsquo;s life.</p>
+<pre><code class="language-jsx">useEffect(() =&gt; {
+  const socket = connect(roomId)      // set up
+  socket.on('message', addMessage)
+  return () =&gt; socket.close()          // tear down
+}, [roomId])
+</code></pre>
+<p>Read that as a statement of fact rather than a schedule: <em>while this component is on screen with this <code>roomId</code>, a connection to that room exists.</em> React decides when to make it true. If <code>roomId</code> changes, the old connection is closed and a new one opened, in that order. If you cannot write your effect as a sentence of that shape, it is probably not an effect.</p>
+<p>The commonest mistake is using an effect to compute state from other state. It works, it renders twice, and it drifts out of sync the moment a code path forgets to update it.</p>
+<pre><code class="language-jsx">// wrong: a second source of truth that has to be kept in step
+const [total, setTotal] = useState(0)
+useEffect(() =&gt; {
+  setTotal(items.reduce((n, i) =&gt; n + i.price, 0))
+}, [items])
+
+// right: there is only one source of truth
+const total = items.reduce((n, i) =&gt; n + i.price, 0)
+</code></pre>
+</section>
+    
+    <section class="level" data-i="3" data-k="page"
+             aria-label="Medium" aria-hidden="true" hidden><p><strong>The three questions</strong></p>
+<p>Before writing an effect, ask: does this talk to something outside React? Does it happen because of a user action? Can it be derived from what I already have?</p>
+<p>If it talks to the outside world — a WebSocket, <code>localStorage</code>, an analytics SDK, a chart library, <code>document.title</code>, an event listener on <code>window</code> — an effect is right. If it happens because the user clicked something, put it in the handler; effects that run &ldquo;after the state changed because of a click&rdquo; are a longer, less reliable way of saying the same thing. If it can be derived, derive it during render, and reach for <code>useMemo</code> only when profiling says the calculation is expensive.</p>
+<p><strong>Cleanup is not optional</strong></p>
+<p>Every subscription, timer, listener and request needs a tear-down. React 18&rsquo;s Strict Mode deliberately mounts each component, unmounts it, and mounts it again in development, precisely so that a missing cleanup shows up on your machine instead of as a leak in production.</p>
+<pre><code class="language-jsx">useEffect(() =&gt; {
+  const id = setInterval(tick, 1000)
+  return () =&gt; clearInterval(id)
+}, [])
+</code></pre>
+<p><strong>Fetching needs a guard</strong></p>
+<p>Two requests started in order do not necessarily finish in order. Without a guard, an old response can overwrite a new one.</p>
+<pre><code class="language-jsx">useEffect(() =&gt; {
+  let stale = false
+  fetch(`/api/user/${id}`)
+    .then(r =&gt; r.json())
+    .then(data =&gt; { if (!stale) setUser(data) })
+  return () =&gt; { stale = true }
+}, [id])
+</code></pre>
+<p>That is the minimum. It still does not handle caching, retries, or the request that starts before the component has painted — which is why data fetching has largely moved into frameworks and libraries built for it.</p>
+<p><strong>Do not fight the dependency array</strong></p>
+<p>An empty array on an effect that reads changing values is the source of the &ldquo;stale closure&rdquo; bug: the function captured the first render&rsquo;s variables and keeps using them forever. Removing a dependency to stop a loop treats the symptom. The loop usually means a dependency is a new object or function on every render, and the fix is to move it inside the effect, or to derive it, not to lie to React about what the effect reads.</p>
+<pre><code class="language-jsx">// loops: options is a new object each render
+useEffect(() =&gt; { subscribe(options) }, [options])
+
+// stable: primitives in, object built inside
+useEffect(() =&gt; { subscribe({ roomId, secure: true }) }, [roomId])
+</code></pre>
+<p><strong>The two effects that are not the same</strong></p>
+<p><code>useEffect</code> runs after the browser paints; <code>useLayoutEffect</code> runs before it. Anything the user could see flicker — measuring a node and repositioning a tooltip — belongs in the layout version. Everything else should stay in the passive one, because blocking paint is a cost paid on every render.</p>
+</section>
+    
+    <section class="level" data-i="4" data-k="pages"
+             aria-label="Long" aria-hidden="true" hidden><h2>Where the confusion comes from</h2>
+<p>Hooks arrived in React 16.8 in February 2019 with documentation that mapped them onto the class lifecycle, because that is what everyone knew. <code>useEffect</code> with an empty array was <code>componentDidMount</code>; the cleanup was <code>componentWillUnmount</code>; a populated array was <code>componentDidUpdate</code> with a manual comparison. The mapping was a teaching aid and it has outlived its usefulness, because it describes <em>when React calls your code</em> rather than <em>what your code is for</em>.</p>
+<p>The declarative framing is better and it is the one the current React documentation uses. A component describes what the screen should look like for the current props and state. An effect describes what should be true <em>outside</em> React for the current props and state. Both are re-evaluated as needed. Neither is a timeline.</p>
+<p>That shift explains behaviour that is baffling under the lifecycle model. Why does Strict Mode run my effect twice? Because &ldquo;set up, tear down, set up again&rdquo; must be indistinguishable from &ldquo;set up once&rdquo; if the effect is written correctly, and React wants you to find out now. Why did my effect run again when only an unrelated prop changed? Because the object you passed in the dependency array is recreated on every render, and React compares with <code>Object.is</code>.</p>
+<h2>The rules, in order of how much pain they save</h2>
+<p><strong>1. Do not use an effect to transform data for rendering.</strong></p>
+<p>Anything computable from props and state should be computed during render. An effect that calls <code>setState</code> causes a second render pass, and the intermediate render shows stale data.</p>
+<pre><code class="language-jsx">// wrong
+const [visible, setVisible] = useState([])
+useEffect(() =&gt; { setVisible(items.filter(i =&gt; i.active)) }, [items])
+
+// right
+const visible = items.filter(i =&gt; i.active)
+</code></pre>
+<p>For genuinely expensive work, wrap it in <code>useMemo</code> — but measure first. Filtering a few hundred rows is not expensive.</p>
+<p><strong>2. Do not use an effect to handle user events.</strong></p>
+<p>If the code should run because the user submitted a form, it goes in the submit handler. An effect cannot tell <em>why</em> state changed, only that it did, so event logic in an effect fires in cases you did not intend.</p>
+<pre><code class="language-jsx">// wrong: also fires if the cart is restored from storage on load
+useEffect(() =&gt; { if (cart.length) track('cart_updated', cart) }, [cart])
+
+// right
+function addToCart(item) {
+  setCart([...cart, item])
+  track('item_added', item)
+}
+</code></pre>
+<p><strong>3. Do not reset state with an effect. Use a key.</strong></p>
+<p>Clearing a form when the user switches profiles is not synchronisation; it is a statement that this is a different component instance.</p>
+<pre><code class="language-jsx">// wrong
+useEffect(() =&gt; { setDraft('') }, [userId])
+
+// right: a new key gives a fresh component, with fresh state
+&lt;Editor key={userId} /&gt;
+</code></pre>
+<p><strong>4. Subscribe with <code>useSyncExternalStore</code>, not an effect.</strong></p>
+<p>For reading a value from an outside store — network status, a media query, a third-party store — there is a dedicated hook that avoids tearing during concurrent rendering.</p>
+<pre><code class="language-jsx">const online = useSyncExternalStore(
+  cb =&gt; { window.addEventListener('online', cb); window.addEventListener('offline', cb)
+          return () =&gt; { window.removeEventListener('online', cb)
+                         window.removeEventListener('offline', cb) } },
+  () =&gt; navigator.onLine,
+  () =&gt; true                       // what the server should assume
+)
+</code></pre>
+<p><strong>5. Keep the dependency array honest.</strong></p>
+<p>The linter is right more often than you are. If the array feels wrong, the effect is usually doing two jobs and should be split, or it is reading something that ought to be a ref.</p>
+<h2>What is left, and why it is worth it</h2>
+<p>Strip out the four misuses above and what remains is a small, well-behaved set: connections, subscriptions, timers, imperative DOM work, third-party widget instances, browser APIs, logging that should fire on view rather than on click. These are the cases where the outside world has state of its own that must be dragged into agreement with yours.</p>
+<p>Here is one written carefully, with everything the pattern needs.</p>
+<pre><code class="language-jsx">function ChatRoom({ roomId, theme }) {
+  const [messages, setMessages] = useState([])
+
+  useEffect(() =&gt; {
+    const conn = createConnection(serverUrl, roomId)
+    conn.on('message', msg =&gt; setMessages(prev =&gt; [...prev, msg]))
+    conn.connect()
+    return () =&gt; conn.disconnect()
+  }, [roomId])                     // theme is not here: it changes nothing outside
+
+  return &lt;Layout theme={theme}&gt;{messages.map(renderMessage)}&lt;/Layout&gt;
+}
+</code></pre>
+<p>Three details carry the weight. The updater form of <code>setMessages</code> means the effect does not depend on the current messages, so a new message does not tear down the connection. <code>theme</code> is absent from the array because reconnecting a socket when a colour changes would be absurd — and if the linter complains, that is a sign the effect is reading something it should not. And the cleanup is unconditional: it runs on unmount, on a <code>roomId</code> change, and on the second mount that Strict Mode forces.</p>
+<h2>The escape hatch, and its trap</h2>
+<p>Sometimes an effect must read a value without re-running when it changes — logging the current theme when a connection opens, for instance. The stopgap is a ref updated during render, and it is deliberately awkward because it is easy to misuse.</p>
+<pre><code class="language-jsx">const latest = useRef(onMessage)
+useEffect(() =&gt; { latest.current = onMessage })
+
+useEffect(() =&gt; {
+  const conn = createConnection(serverUrl, roomId)
+  conn.on('message', msg =&gt; latest.current(msg))
+  conn.connect()
+  return () =&gt; conn.disconnect()
+}, [roomId])
+</code></pre>
+<p>React has an experimental API, <code>useEffectEvent</code>, that makes this pattern first-class: a function that always sees the latest props and state but is not itself reactive, so it never belongs in a dependency array. Until it ships, the ref version above is the accepted workaround — used sparingly, because every value you hide from the array is a value React can no longer keep in sync for you.</p>
+<h2>The shape of a good effect</h2>
+<p>Four properties, and they can be checked without running anything.</p>
+<p>It reads as a statement about the outside world, not a schedule. It has exactly one job. Its cleanup exactly undoes its setup. And running it twice in a row is indistinguishable, from the outside, from running it once.</p>
+<p>Most effects in most codebases fail at least two of those, and almost all of them fail because they are doing work that never needed an effect in the first place. The React team&rsquo;s own advice is blunt about it, and it is the sentence worth keeping: if you are not synchronising with an external system, you probably do not need an effect.</p>
+</section>
+    
+  </div>
+</article>
+
+</main>
+
+<footer class="site">
+  <p>2026</p>
+</footer>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# the built site is kept: it is what gets pushed. See `make export`, which
+# empties the folder first so a renamed post leaves no orphan behind.
+
+# the compiled server: make build writes it
+baumkuchen
+
+# the usual noise
+*.test
+*.out
+.DS_Store
+
+# the coverage profile
+.cover.out

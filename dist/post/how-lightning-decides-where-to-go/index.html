@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Lightning Decides Where To Go · Four Depths</title>
+<meta name="description" content="A blog that lets you choose how deep you read: one sentence, one paragraph, three paragraphs, one page, three pages.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2213%22 font-size=%2214%22>◐</text></svg>">
+<script>
+  
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site">
+  <a class="wordmark" href="/">Four&nbsp;Depths</a>
+  <button id="theme" class="theme" type="button" aria-label="Change the theme">
+    <span class="dot" aria-hidden="true"></span><span class="theme-name">auto</span>
+  </button>
+</header>
+
+<main>
+
+<article class="post" id="post">
+  <p class="crumb"><a href="/">← all posts</a></p>
+  <h1>How Lightning Decides Where To Go</h1>
+  
+  <p class="meta">
+    
+    
+    <span class="tag">physics</span>
+    <span>9 Aug 2026</span>
+    
+  </p>
+  
+
+  
+  <div class="depth" id="depth">
+    <div class="depth-row">
+      <button class="step" id="shorter" type="button" aria-label="A shorter depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
+      </button>
+      <input id="range" class="range" type="range" min="0" max="4" step="any" value="0"
+             aria-label="Reading depth" list="stops">
+      <button class="step" id="longer" type="button" aria-label="A longer depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
+      </button>
+      <datalist id="stops"><option value="0" label="Sentence" data-w="32" data-r="0.2 min"></option><option value="1" label="Paragraph" data-w="113" data-r="0.7 min"></option><option value="2" label="Short" data-w="323" data-r="2.0 min"></option><option value="3" label="Medium" data-w="469" data-r="2.8 min"></option><option value="4" label="Long" data-w="1190" data-r="7.2 min"></option></datalist>
+    </div>
+    <p class="now"><span id="now"><span class="lbl">Sentence</span><span class="wc">32 words · 0.2 min</span></span></p>
+  </div>
+  
+
+  <div class="levels" id="levels">
+    
+    <section class="level is-active" data-i="0" data-k="sentence"
+             aria-label="Sentence" aria-hidden="false"><p>A lightning strike is not aimed: a faint channel gropes blindly down in 50-metre steps, and the ground only <em>chooses</em> in the last millisecond, when an upward spark leaps to meet it.</p>
+</section>
+    
+    <section class="level" data-i="1" data-k="paragraph"
+             aria-label="Paragraph" aria-hidden="true" hidden><p>Inside a thunderstorm, colliding ice pellets and crystals strip charge from one another until the cloud splits into layers of opposite sign, with tens of coulombs sitting a few kilometres up. When the field can no longer be contained, a dim <strong>stepped leader</strong> works downward in jerky 50-metre jumps, branching, carrying the cloud&rsquo;s potential with it. It is not seeking anything. But near the surface the field grows intense enough that tall objects throw up <em>streamers</em> of their own. The first to connect completes the circuit, and the return stroke rips back up the channel at a third of light speed, heating the air to 30,000 K. That flash is what you see.</p>
+</section>
+    
+    <section class="level" data-i="2" data-k="paragraphs"
+             aria-label="Short" aria-hidden="true" hidden><p>The charge comes from ice. In the strong updraught of a cumulonimbus, soft hail pellets called graupel fall through a mist of ice crystals and supercooled droplets, and every collision transfers a little charge. Which way the charge moves depends on temperature: above roughly −15 °C the graupel tends to end up positive, below it, negative. Because the heavy graupel falls and the light crystals are carried up, the storm sorts itself into a positive upper region and a large negative one in its middle, with a smaller positive pocket at the base. The result is a stack of charged layers separated by kilometres of air, and a potential difference measured in hundreds of megavolts.</p>
+<p>Then comes an awkward fact: the electric fields actually measured inside thunderclouds are usually only a tenth of what it should take to break down air. Something must help the discharge get started. The leading candidate is <em>relativistic runaway breakdown</em>, in which a high-energy electron — plausibly a secondary particle from a cosmic ray hitting the atmosphere — is accelerated by the storm&rsquo;s field faster than collisions can slow it, knocking loose more electrons that also run away, until an avalanche of relativistic electrons seeds a conducting path. Storms do emit brief bursts of gamma rays, which is exactly what such an avalanche should produce, but the details of initiation remain genuinely unsettled.</p>
+<p>Once started, the discharge is a race. The stepped leader descends at around 200 kilometres per second, pausing tens of microseconds between steps, splitting into a downward tree of possibilities. Objects below answer with upward streamers, and the <em>striking distance</em> at which one succeeds is 30 to 100 metres — which is why a lightning rod protects a volume rather than a point. When contact is made, up to <strong>30,000 amperes</strong> flows in the return stroke, and the same channel is often reused by faster <em>dart leaders</em>: the flicker you see in a single flash.</p>
+</section>
+    
+    <section class="level" data-i="3" data-k="page"
+             aria-label="Medium" aria-hidden="true" hidden><p><strong>A storm is a charge separator</strong></p>
+<p>Every thundercloud is a machine for pulling positive and negative apart and stacking them at a distance. The mechanism is collisional: in the mixed-phase region of the cloud, between about −10 °C and −25 °C, riming graupel collides with tiny ice crystals in the presence of supercooled water, and charge hops between them. The sign of the transfer flips at a reversal temperature near −15 °C. Gravity does the sorting — graupel falls, crystals rise — and within twenty minutes a growing storm has built a dipole strong enough to make lightning.</p>
+<p><strong>Air is a very good insulator, until it is not</strong></p>
+<p>Dry air breaks down at about 3 million volts per metre. Storms rarely exceed a few hundred thousand. The gap is bridged by some combination of local field enhancement around hydrometeors and runaway electron avalanches seeded by cosmic-ray secondaries. Once a small volume of air ionises, it conducts, which concentrates the field at its tip, which ionises the next volume: a self-propagating filament, hot enough to glow faintly, cool enough to be invisible in daylight.</p>
+<p><strong>The leader gropes; the ground answers</strong></p>
+<p>The stepped leader carries roughly five coulombs of charge and the potential of the cloud with it, extending in discrete steps of tens of metres with pauses of about 50 microseconds. It branches constantly, exploring several routes at once, and it does not know where the ground is. Only when a branch tip comes within the striking distance does the field at pointed objects below exceed breakdown, launching upward positive streamers from fence posts, blades of grass, lightning rods and human heads. One streamer meets one branch. That junction fixes the strike point.</p>
+<p><strong>The return stroke is the bright part</strong></p>
+<p>With the circuit closed, ground potential races up the channel at 10⁸ metres per second, neutralising the charge in the leader. Currents peak near 30 kA — occasionally over 200 kA — for tens of microseconds. The channel, a few centimetres wide, reaches about 30,000 K, five times the surface of the Sun, in that time. It cannot expand fast enough to stay in pressure balance, so it explodes outward as a shock wave that decays into the sound of thunder, taking about three seconds to travel each kilometre back to you.</p>
+<p><strong>Then it does it again</strong></p>
+<p>Most flashes contain three or four strokes. After the first, a dart leader can run down the still-warm channel in a millisecond and trigger another return stroke, which is why lightning appears to flicker. Roughly 90–95% of cloud-to-ground flashes lower negative charge. The rare positive flash, launched from the anvil far from the rain, carries more charge, lasts longer, and starts more wildfires — and it can strike many kilometres from any rain, which is the origin of &ldquo;a bolt from the blue&rdquo;.</p>
+</section>
+    
+    <section class="level" data-i="4" data-k="pages"
+             aria-label="Long" aria-hidden="true" hidden><h2>The scale of the thing</h2>
+<p>Lightning is not rare. About 44 flashes occur somewhere on Earth every second — roughly 1.4 billion a year — concentrated over tropical land, where afternoon heating drives the deepest convection. The world&rsquo;s most reliable lightning is over Lake Maracaibo in Venezuela, where a nightly convergence of mountain breezes and warm lake air produces storms on some 300 nights a year. Ocean lightning is far less common: water heats slowly and evenly, so oceanic convection is weaker, and the difference is stark enough to trace coastlines in a global lightning map.</p>
+<p>Most flashes never reach the ground. Intracloud discharges between the upper positive and mid-level negative regions outnumber cloud-to-ground strikes by perhaps three to one. They are the flashes that light the inside of a cloud like a paper lantern.</p>
+<h2>Building the charge</h2>
+<p>The dominant mechanism is <em>non-inductive charging</em>, established through decades of laboratory work in which ice crystals are blown past a riming target. When a crystal bounces off graupel that is actively collecting supercooled droplets, charge transfers, and the sign depends on temperature, liquid water content and the relative growth rates of the two surfaces. The consensus picture: the surface that is growing faster by vapour deposition tends to charge positive.</p>
+<p>In a storm this produces a tripole. A main negative charge region sits in the layer between about −10 °C and −25 °C, typically 5–8 km up, holding tens of coulombs. Above it, carried aloft on the updraught, is a broad positive region in the anvil. Below, often, a small positive pocket forms near the cloud base, probably from graupel that has fallen into warmer air and reversed its charging sign. This lower pocket matters more than its size suggests: it can screen the negative layer from the ground, and its erosion in a decaying storm is one reason late-stage storms produce dangerous positive flashes.</p>
+<p>Above it all lies the global electric circuit, a concept from C.T.R. Wilson: thunderstorms act as generators pumping negative charge to the ground and positive to the ionosphere, maintaining a planet-wide fair-weather field of about 100 volts per metre that discharges slowly everywhere else. You stand, always, in a gentle vertical field maintained by storms you cannot see.</p>
+<h2>Initiation, still unsolved</h2>
+<p>The initiation problem is real and unresolved. Balloon and aircraft measurements inside thunderstorms consistently find peak fields of 100–400 kV/m, well under the ~3 MV/m needed to break down dry air at sea level, or ~1 MV/m at thunderstorm altitudes where the air is thinner.</p>
+<p>Two families of explanation compete, and may both be right. The first is local enhancement: elongated ice hydrometeors, colliding droplets, or corona from raindrop tips concentrate the field near sharp features by an order of magnitude, producing small streamers that merge into a leader. The second is runaway breakdown. A free electron in a strong field normally loses energy to collisions faster than it gains it from the field — but above a certain energy, the drag curve turns over, and the electron accelerates indefinitely, ionising as it goes and producing more runaway electrons. Given a seed of energetic particles, which cosmic-ray air showers supply continuously, an avalanche can develop in fields far below conventional breakdown.</p>
+<p>Evidence for the second is indirect but striking: thunderstorms emit terrestrial gamma-ray flashes, sub-millisecond bursts of hard X-rays and gamma rays detected from orbit, energetic enough to be produced only by relativistic electrons. Some are bright enough to be detectable as a radiation dose to an aircraft passing nearby. Storms are, briefly, particle accelerators.</p>
+<h2>The strike, microsecond by microsecond</h2>
+<p>Take a typical negative cloud-to-ground flash and slow it down.</p>
+<p>At t = 0, a preliminary breakdown between the negative region and the lower positive pocket creates a conducting path inside the cloud. Within a few milliseconds, a stepped leader emerges from the cloud base. Over the next 20 milliseconds it descends in steps of about 50 metres, each step forming in under a microsecond and followed by a 20–50 microsecond pause while charge flows down to re-establish the tip potential. The leader branches downward, carrying perhaps 5 coulombs distributed along a channel that is now kilometres long, at a potential of tens of megavolts relative to ground.</p>
+<p>At about 100 metres above the surface, the field beneath the leader tip reaches breakdown at pointed objects. Upward positive streamers launch — from a chimney, a tree, a golfer&rsquo;s raised club, a wet fencepost. Several may rise; one connects. This is the <em>attachment process</em>, and it is the only moment at which the target is determined. Everything before it is blind.</p>
+<p>Attachment closes the circuit, and the return stroke propagates upward at 1/3 to 1/2 the speed of light, a luminous wave of neutralisation travelling from the ground into the cloud. Peak current arrives within a few microseconds. The channel reaches 30,000 K, dissociates and ionises the air within it, and radiates the visible flash. Pressure inside can reach ten atmospheres, and the resulting shock wave steepens, then decays into an acoustic pulse. Close by, thunder is a single crack; further away, the sound arriving from different parts of a kilometres-long channel smears into a rumble.</p>
+<p>Then, often, a dart leader descends the decaying channel at ten times the speed of the original stepped leader, and a second return stroke follows. Three to four strokes in a flash is typical; the record is over twenty. Some flashes include a <em>continuing current</em> of a few hundred amperes lasting hundreds of milliseconds — low current but high total charge, and the main cause of ignition, whether of a pine forest or an aircraft fuel tank.</p>
+<h2>What lightning leaves behind</h2>
+<p>The nitrogen in the air is chemically inert, and lightning is one of the few natural processes energetic enough to break the triple bond. Each flash produces nitrogen oxides that rain out as nitrate — a modest but real contribution to the natural nitrogen budget, and, before industrial fertiliser, part of what kept ecosystems supplied.</p>
+<p>In sandy soil, a strike can fuse silica into a glassy tube called a fulgurite, a cast of the current&rsquo;s path underground, sometimes several metres long. Trees struck by lightning may have their sap flashed to steam, splitting the trunk. And above the storm, in the thin air of the mesosphere, the sudden removal of charge produces its own family of discharges: red sprites reaching 90 km altitude, expanding rings of light called elves, and blue jets shooting upward from the cloud top — all invisible from the ground on most nights, all routinely photographed now from aircraft and from the International Space Station.</p>
+<p>The practical advice follows from the physics. Since the leader chooses its target only in the final hundred metres, and since the strike point is decided by field enhancement, height and isolation are the risk. Being inside a building or a vehicle is safe not because rubber tyres insulate — they do not — but because a conducting shell carries the current around its occupants. A lightning rod does not attract strikes so much as offer the winning upward streamer a safe, well-grounded place to start.</p>
+</section>
+    
+  </div>
+</article>
+
+</main>
+
+<footer class="site">
+  <p>2026</p>
+</footer>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

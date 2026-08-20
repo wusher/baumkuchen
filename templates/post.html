@@ -1,0 +1,41 @@
+{{define "main"}}
+{{with .Post}}
+<article class="post" id="post">
+  <p class="crumb"><a href="/">← all posts</a></p>
+  <h1>{{.Title}}</h1>
+  {{if or .Draft (not .Pinned)}}
+  <p class="meta">
+    {{if .Draft}}<span class="draft">draft</span>{{end}}
+    {{if not .Pinned}}
+    {{if .Tag}}<span class="tag">{{.Tag}}</span>{{end}}
+    {{if .DateText}}<span>{{.DateText}}</span>{{end}}
+    {{end}}
+  </p>
+  {{end}}
+
+  {{if gt (len .Levels) 1}}
+  <div class="depth" id="depth">
+    <div class="depth-row">
+      <button class="step" id="shorter" type="button" aria-label="A shorter depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
+      </button>
+      <input id="range" class="range" type="range" min="0" max="{{dec (len .Levels)}}" step="any" value="0"
+             aria-label="Reading depth" list="stops">
+      <button class="step" id="longer" type="button" aria-label="A longer depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
+      </button>
+      <datalist id="stops">{{range $i, $l := .Levels}}<option value="{{$i}}" label="{{$l.Label}}" data-w="{{$l.Words}}" data-r="{{$l.Read}}"></option>{{end}}</datalist>
+    </div>
+    <p class="now"><span id="now">{{with index .Levels 0}}<span class="lbl">{{.Label}}</span><span class="wc">{{.Words}} words · {{.Read}}</span>{{end}}</span></p>
+  </div>
+  {{end}}
+
+  <div class="levels{{if eq (len .Levels) 1}} one{{end}}" id="levels"{{if .Depth}} data-depth="{{.Depth}}"{{end}}>
+    {{range $i, $l := .Levels}}
+    <section class="level{{if eq $i 0}} is-active{{end}}" data-i="{{$i}}" data-k="{{$l.Key}}"
+             aria-label="{{$l.Label}}" aria-hidden="{{if eq $i 0}}false{{else}}true{{end}}"{{if ne $i 0}} hidden{{end}}>{{$l.HTML}}</section>
+    {{end}}
+  </div>
+</article>
+{{end}}
+{{end}}

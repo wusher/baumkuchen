@@ -1,0 +1,561 @@
+/* ---------- tokens ---------- */
+:root {
+  color-scheme: light;
+  --paper:   #fbfaf7;
+  --raised:  #ffffff;
+  --ink:     #17171a;
+  --ink-2:   #3c3c42;
+  --muted:   #67655d;
+  --rule:    #e6e2d9;
+  --chip:    #eeeae1;
+  --accent:  #a2481a;
+  /* the accent has two values: one that reads on paper, one that reads on the
+     dark ground. A named colour below sets both, and the theme picks. */
+  --dark-accent: #e0a25f;
+  --shadow:  0 1px 2px rgba(20,18,14,.05);
+  --serif: "Iowan Old Style", Charter, "Source Serif 4", "Source Serif Pro", "Noto Serif", "Liberation Serif", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  /* the width of the column: the header, the article and the footer all take
+     it. Wider is more words a line; 40rem is about 65 characters, 44rem about
+     78. Change this one line and the whole page follows. */
+  --measure: 40rem;
+  /* the height of the top row: the wordmark, the theme button and the crumb
+     all centre on it, so the three read as one line */
+  --row: 1.8rem;
+  --ease: cubic-bezier(.22,.72,.18,1);
+}
+/* ---------- the named colours ---------- */
+/* A post may take one of these with `color: emerald` in its front matter. The
+   names are the ones Tailwind uses, because they are easy to remember; the
+   values are this site's own. Each was found by walking the lightness until it
+   reads at about 5.6:1 on the paper and 8.4:1 on the dark ground, which is
+   where the site's own accent sits. An accent is a link colour here, so it has
+   to be readable, not only visible. */
+[data-color="slate"] { --accent: #586679; --dark-accent: #a2adbc; }
+[data-color="gray"] { --accent: #5f6570; --dark-accent: #a8acb5; }
+[data-color="zinc"] { --accent: #636370; --dark-accent: #ababb4; }
+[data-color="neutral"] { --accent: #69645f; --dark-accent: #b0aba7; }
+[data-color="stone"] { --accent: #726156; --dark-accent: #b7aaa0; }
+[data-color="red"] { --accent: #ac4232; --dark-accent: #df9b90; }
+[data-color="orange"] { --accent: #985224; --dark-accent: #de9e73; }
+[data-color="amber"] { --accent: #835e1f; --dark-accent: #d5a44e; }
+[data-color="yellow"] { --accent: #74631f; --dark-accent: #c7aa35; }
+[data-color="lime"] { --accent: #506d26; --dark-accent: #88bb42; }
+[data-color="green"] { --accent: #2e7145; --dark-accent: #61bf80; }
+[data-color="emerald"] { --accent: #2b7057; --dark-accent: #55bf98; }
+[data-color="teal"] { --accent: #2d6f69; --dark-accent: #5abcb3; }
+[data-color="cyan"] { --accent: #2e6d7a; --dark-accent: #6bb7c7; }
+[data-color="sky"] { --accent: #336991; --dark-accent: #82b2d3; }
+[data-color="blue"] { --accent: #3d62ad; --dark-accent: #96adda; }
+[data-color="indigo"] { --accent: #6057bb; --dark-accent: #aba7db; }
+[data-color="violet"] { --accent: #794eb7; --dark-accent: #b9a2d9; }
+[data-color="purple"] { --accent: #8c49a2; --dark-accent: #c69ed3; }
+[data-color="fuchsia"] { --accent: #9a4293; --dark-accent: #d399ce; }
+[data-color="pink"] { --accent: #a7406b; --dark-accent: #d99ab4; }
+[data-color="rose"] { --accent: #b03b4e; --dark-accent: #dd9aa5; }
+
+:root[data-theme="dark"], html[data-theme="auto"] {}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { color-scheme: dark; }
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-theme="dark"],
+:root[data-theme="auto"] {
+  --dark-paper:  #100f0e;
+  --dark-raised: #171614;
+  --dark-ink:    #ece8e0;
+  --dark-ink-2:  #c9c5bc;
+  --dark-muted:  #8d8a81;
+  --dark-rule:   #2a2825;
+  --dark-chip:   #232120;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --paper: var(--dark-paper); --raised: var(--dark-raised);
+    --ink: var(--dark-ink); --ink-2: var(--dark-ink-2); --muted: var(--dark-muted);
+    --rule: var(--dark-rule); --accent: var(--dark-accent); --chip: var(--dark-chip);
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: var(--dark-paper); --raised: var(--dark-raised);
+  --ink: var(--dark-ink); --ink-2: var(--dark-ink-2); --muted: var(--dark-muted);
+  --rule: var(--dark-rule); --accent: var(--dark-accent); --chip: var(--dark-chip);
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+/* light text on a dark ground reads better with thinner strokes */
+:root[data-theme="dark"] body {
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] body {
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ---------- base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Hold the room for the scrollbar at all times. Without this the window
+     narrows the moment a depth is long enough to need one, and the whole
+     column jumps sideways as the reader moves the slider. */
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  html { overflow-y: scroll; }
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.125rem/1.78 var(--serif);
+  font-feature-settings: "kern", "liga", "onum";
+  text-rendering: optimizeLegibility;
+  /* the whole site reads in lower case; code and quotations keep theirs */
+  text-transform: lowercase;
+  transition: background-color .4s var(--ease), color .4s var(--ease);
+}
+code, pre, pre *, blockquote, blockquote *, abbr, kbd, samp {
+  text-transform: none;
+}
+p, li { text-wrap: pretty; }
+h1, h2, h3, h4 { text-wrap: balance; }
+/* one focus ring for everything a keyboard can reach */
+:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px;
+}
+a {
+  color: inherit; text-decoration-color: var(--rule);
+  text-underline-offset: .2em; text-decoration-thickness: 1px;
+}
+a:hover { text-decoration-color: var(--accent); color: var(--accent); }
+h1, h2, h3, h4 { font-weight: 600; letter-spacing: -.014em; line-height: 1.2; }
+p { margin: 0 0 1.25em; }
+main { max-width: var(--measure); margin: 0 auto; padding: 0 1.4rem 6rem; }
+
+/* ---------- site chrome ---------- */
+header.site, footer.site {
+  max-width: var(--measure); margin: 0 auto; padding: 2.2rem 1.4rem 2.6rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+footer.site { padding-top: 2rem; padding-bottom: 3rem; border-top: 1px solid var(--rule); }
+
+/* Above the phone width the wordmark and the theme button leave the flow and
+   take the two top corners of the page. The header keeps no height of its own,
+   so everything below it can rise. The band itself must not catch a click that
+   belongs to the text under it; only its two children do. */
+@media (min-width: 621px) {
+  body { position: relative; }
+  header.site {
+    position: absolute; top: 0; left: 0; right: 0;
+    max-width: none; margin: 0; padding: 1.4rem 1.7rem;
+    pointer-events: none;
+  }
+  header.site > * { pointer-events: auto; }
+  /* between 621px and the width below, the corners still sit over the column,
+     so the text starts under them */
+  main { padding-top: 4rem; }
+}
+
+/* Wide enough that the 44rem column clears both corners: now the text can go
+   to the top, and its first line sits level with the wordmark. The crumb takes
+   the height of the top row, so the three items share one centre line. */
+@media (min-width: 1024px) {
+  main { padding-top: 1.4rem; }
+  .post > .crumb { display: flex; align-items: center; min-height: var(--row); }
+}
+footer.site p { margin: 0; color: var(--muted); font: 400 .85rem/1.5 var(--sans); }
+.wordmark {
+  font: 600 .82rem/1.3 var(--sans); letter-spacing: .1em; text-transform: lowercase;
+  text-decoration: none; color: var(--ink);
+}
+.wordmark:hover { color: var(--accent); }
+
+.theme {
+  display: inline-flex; align-items: center; gap: .48rem; min-height: var(--row);
+  background: none; border: 1px solid var(--rule); border-radius: 100px;
+  padding: .32rem .7rem; cursor: pointer; color: var(--muted);
+  font: 500 .79rem/1.3 var(--sans); letter-spacing: .07em; text-transform: lowercase;
+  transition: border-color .25s, color .25s;
+}
+.theme:hover { border-color: var(--accent); color: var(--accent); }
+.theme .dot {
+  width: .58rem; height: .58rem; border-radius: 50%;
+  border: 1px solid currentColor;
+  background: linear-gradient(90deg, currentColor 0 50%, transparent 50% 100%);
+}
+
+/* ---------- index ---------- */
+.intro { margin: 1rem 0 3.6rem; }
+/* the intro is written in the template; with nothing in it, it takes no room */
+.intro h1:empty, .intro p:empty { display: none; }
+.intro:has(h1:empty):has(p:empty) { margin: 0; }
+.intro h1 { font-size: clamp(2rem, 6vw, 2.7rem); margin: 0 0 1rem; }
+.intro p { color: var(--ink-2); font-size: 1.14rem; max-width: 32rem; }
+
+.feed { list-style: none; margin: 0; padding: 0; }
+/* A small label over each group says what the group is, so the titles do not
+   have to carry that themselves. The air above the page sits on the first
+   label, not on the list. */
+.eyebrow {
+  font: 500 .72rem/1 var(--sans); letter-spacing: .16em;
+  color: var(--muted); margin: 0 0 .95rem;
+}
+.eyebrow.pages { margin-top: 1.8rem; }
+.eyebrow.posts { margin-top: 1.7rem; }
+
+/* Wide enough for the corners: the label over the pages is the first line of
+   the column, so it stands in the same row as the wordmark and the theme
+   button. This block must come after the margin above, or that one wins. */
+@media (min-width: 1024px) {
+  .eyebrow.pages {
+    display: flex; align-items: center;
+    min-height: var(--row); margin-top: 0;
+  }
+}
+
+/* The pinned pages are post titles, at the same size, but they stand closer
+   to each other than the posts do: a short list of pages, not a feed. */
+.feed.pinned .card { padding: .55rem 0; }
+.feed.pinned .card:first-child { padding-top: 0; }
+
+/* the one line on the index: it marks where the pages stop and the posts
+   start, and it is the only rule in the list */
+.split {
+  border: 0; border-top: 1px solid var(--rule);
+  margin: 1.4rem 0 0;
+}
+.card { padding: 1.9rem 0; }
+.card a { display: block; text-decoration: none; }
+.card h2 {
+  font-size: 1.42rem; margin: 0;
+  transition: color .25s var(--ease);
+}
+.card a:hover h2 { color: var(--accent); }
+.card .lead, .card .empty { margin: 0; color: var(--muted); }
+/* a lead that is a quotation keeps the card flat: no rule, no extra space */
+.card .lead blockquote { margin: 0; padding: 0; border: 0; font-style: italic; }
+.card .lead blockquote p + p { margin-top: .35rem; font-style: normal; font-size: .92em; }
+.meta {
+  display: flex; flex-wrap: wrap; gap: .9rem; margin: .85rem 0 0;
+  color: var(--muted); font: 400 .8rem/1.4 var(--sans); letter-spacing: .03em;
+}
+.tag { letter-spacing: .09em; color: var(--accent); }
+/* a draft is on the index and on its own page while the server runs, but it
+   never reaches the built site, so it says what it is */
+.draft {
+  color: var(--paper); background: var(--accent);
+  border-radius: 100px; padding: .12em .6em;
+  font-weight: 600; letter-spacing: .1em;
+}
+
+.drafts { margin-top: 3.4rem; padding: 1.4rem 1.5rem; border: 1px dashed var(--rule); border-radius: 10px; }
+.drafts h2 { font: 600 .76rem/1 var(--sans); letter-spacing: .1em; margin: 0 0 .7rem; color: var(--muted); }
+.drafts p, .drafts li { font: 400 .88rem/1.6 var(--sans); color: var(--muted); }
+.drafts ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+.drafts b { color: var(--ink-2); font-weight: 600; }
+
+/* ---------- post ---------- */
+.crumb { font: 500 .8rem/1.3 var(--sans); letter-spacing: .06em; margin: 0 0 2rem; }
+.crumb a { text-decoration: none; color: var(--muted); }
+.crumb a:hover { color: var(--accent); }
+.post > h1 { font-size: clamp(1.9rem, 5.4vw, 2.5rem); margin: 0 0 .8rem; }
+
+/* ---------- depth control ---------- */
+.depth { margin: 2.6rem 0 2.8rem; }
+.depth-row {
+  display: flex; align-items: center; gap: .2rem; padding: 0 .1rem;
+}
+.range { flex: 1; min-width: 0; }
+
+/* One step shorter, one step longer. The chevron is drawn at the weight of the
+   rules on this page, and the button takes its colour from the same three
+   states the rest of the chrome uses: muted, accent on a hover, faded at the
+   end of the run. The box is as tall as the top row, so it is easy to hit. */
+.step {
+  appearance: none; -webkit-appearance: none;
+  background: none; border: 0; padding: 0 .45rem; margin: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.9rem; min-height: var(--row);
+  color: var(--muted); cursor: pointer;
+  transition: color .25s var(--ease), opacity .25s var(--ease);
+}
+.step svg {
+  width: .82rem; height: .82rem; display: block;
+  fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.step:hover:not(:disabled) { color: var(--accent); }
+.step:disabled { opacity: .3; cursor: default; }
+.range {
+  -webkit-appearance: none; appearance: none; width: 100%;
+  background: none; cursor: pointer; display: block;
+  /* The strip you can hit is taller than the strip you can see. The whole
+     element is the target, so the height is doubled and the extra is pulled
+     back with a negative margin: the track and the thumb stay centred where
+     they were, and nothing below the slider moves. */
+  height: 3.2rem;
+  margin-block: -0.8rem;
+}
+.range:focus { outline: none; }
+.range::-webkit-slider-runnable-track {
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) 0 var(--p,0%), var(--rule) var(--p,0%) 100%);
+}
+.range::-moz-range-track { height: 2px; border-radius: 2px; background: var(--rule); }
+.range::-moz-range-progress { height: 2px; border-radius: 2px; background: var(--accent); }
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: .82rem; height: .82rem; margin-top: -.36rem; border-radius: 50%;
+  background: var(--accent); border: 3px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--accent);
+  transition: transform .25s var(--ease);
+}
+.range::-moz-range-thumb {
+  width: .82rem; height: .82rem; border-radius: 50%;
+  background: var(--accent); border: 3px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.range:active::-webkit-slider-thumb { transform: scale(1.22); }
+.range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--accent), 0 0 0 5px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+.now {
+  margin: .75rem 0 0; text-align: center;
+  font: 500 .8rem/1.3 var(--sans); letter-spacing: .12em;
+  color: var(--accent);
+}
+.now span { display: inline-block; }
+.now .wc { margin-left: .6rem; color: var(--muted); letter-spacing: .1em; }
+.now .bump { animation: bump .42s var(--ease); }
+@keyframes bump {
+  from { opacity: 0; transform: translateY(4px) scale(.96); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+
+/* ---------- the depths ---------- */
+/* Each word is its own box, timed by how far it sits from the middle of the
+   shorter version. A longer version grows out of that point; a shorter one
+   drops its outer words first and collapses back into it. */
+.levels { position: relative; transition: height .52s var(--ease); }
+.levels.no-anim { transition: none; }
+.level {
+  position: absolute; top: 0; left: 0; width: 100%;
+  opacity: 0; visibility: hidden; pointer-events: none;
+}
+.level.is-active { opacity: 1; visibility: visible; pointer-events: auto; }
+.level.is-leaving { opacity: 1; visibility: visible; pointer-events: none; }
+html:not(.js) .level { position: static; opacity: 1; visibility: visible; }
+/* one depth only: no slider, so the text keeps the page open by itself */
+.levels.one { transition: none; }
+.levels.one .level { position: static; opacity: 1; visibility: visible; }
+/* With one depth the slider is not drawn, so nothing holds the text off the
+   meta line. Take the space the slider's own top margin would have taken. */
+.post > .meta + .levels { margin-top: 2.6rem; }
+
+.w { display: inline-block; transform-origin: 50% 62%; }
+
+/* a picture or a code block moves as one piece, not word by word */
+/* the piece may be a block itself, or sit inside one */
+.level.pop .vis .shot, .level.pop .vis.shot { animation: show .46s var(--ease) both; animation-delay: var(--d, 0ms); }
+.level.fall .vis .shot, .level.fall .vis.shot { animation: hide .18s ease-in both; animation-delay: var(--d, 0ms); }
+@keyframes show { from { opacity: 0; transform: scale(.965); } to { opacity: 1; transform: none; } }
+@keyframes hide { from { opacity: 1; } to { opacity: 0; transform: scale(.985); } }
+
+/* Only the blocks the reader can see are animated. */
+.level.pop .vis .w { animation: type-in .22s cubic-bezier(.2,1.3,.4,1) both; animation-delay: var(--d, 0ms); }
+/* a word both versions hold does not blink: it slides to its new place */
+.level.pop .vis .w.keep { animation: shift .34s var(--ease) both; }
+.w.ghost { visibility: hidden; }
+@keyframes shift {
+  from { transform: translate(var(--dx, 0), var(--dy, 0)); }
+  to   { transform: none; }
+}
+.level.fall .vis .w { animation: delete-out .14s cubic-bezier(.6,-.2,.85,.2) both; animation-delay: var(--d, 0ms); }
+
+/* No fade: a word is at full strength the instant it starts, and it opens
+   out of nothing. It leaves the same way, by closing up. */
+@keyframes type-in {
+  from { opacity: 0; transform: scale(0); }
+  1%   { opacity: 1; transform: scale(.1); }
+  70%  { opacity: 1; transform: scale(1.08); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes delete-out {
+  from { opacity: 1; transform: scale(1); }
+  99%  { opacity: 1; transform: scale(0); }
+  to   { opacity: 0; transform: scale(0); }
+}
+
+/* ---------- text inside a depth ---------- */
+/* The H1s of a file become the title and the depths themselves, so an H2
+   inside a depth is the top heading a reader ever sees. It is sized to match. */
+/* the article reads a little smaller than the rest of the site;
+   the headings keep their size, so they stand further out */
+.level { font-size: 1.0625rem; }
+.level h2 { font-size: 2rem; margin: 3rem 0 .9rem; }
+.level h3 { font-size: 1.6rem; margin: 2.9rem 0 .9rem; color: var(--ink); }
+.level h4 { font-size: 1.25rem; margin: 2rem 0 .55rem; color: var(--ink-2); }
+.level > :first-child { margin-top: 0; }
+.level p { color: var(--ink-2); }
+/* the big type belongs to the short depths themselves, not to the first one a
+   post happens to carry: a post can start at Short, or at any other depth */
+.level.is-active[data-k="sentence"] p { font-size: 1.24em; line-height: 1.58; color: var(--ink); }
+.level.is-active[data-k="paragraph"] p { font-size: 1.04em; }
+.level blockquote {
+  margin: 1.9rem 0; padding-left: 1.3rem; border-left: 2px solid var(--accent);
+  color: var(--muted); font-style: italic;
+}
+.level ul, .level ol { padding-left: 1.3rem; color: var(--ink-2); }
+.level table {
+  width: 100%; border-collapse: collapse; margin: 1.9rem 0;
+  font: 400 .94rem/1.5 var(--sans); color: var(--ink-2);
+}
+.level thead th {
+  text-align: left; font-weight: 600; color: var(--ink);
+  padding: 0 .9rem .5rem 0; border-bottom: 1px solid var(--rule);
+}
+.level tbody td { padding: .55rem .9rem .55rem 0; border-bottom: 1px solid var(--rule); }
+.level tbody tr:last-child td { border-bottom: 0; }
+.level table th:last-child, .level table td:last-child { padding-right: 0; }
+.level li { margin-bottom: .5em; padding-left: .2em; }
+.level img {
+  display: block; width: 100%; height: auto; border-radius: 3px;
+  background: var(--raised);
+}
+.level p img + em {
+  display: block; margin-top: .75rem; max-width: 30rem;
+  font: italic 400 .9rem/1.55 var(--sans); color: var(--muted);
+}
+
+/* A picture is placed by the end of its path: #left, #right or #center, as in
+   ![alt](/media/name.jpg#right). All three are held to half the measure. The
+   picture and its caption share one paragraph, so the paragraph is what moves,
+   and the caption travels with it. */
+.level { display: flow-root; }
+.level p:has(> img[src$="#left"]),
+.level p:has(> img[src$="#right"]),
+.level p:has(> img[src$="#center"]) {
+  width: 50%; max-width: 50%; margin-top: .4rem; margin-bottom: 1.1rem;
+}
+.level p:has(> img[src$="#left"])  { float: left;  margin-right: 1.7rem; }
+.level p:has(> img[src$="#right"]) { float: right; margin-left: 1.7rem; }
+.level p:has(> img[src$="#center"]) {
+  float: none; margin-left: auto; margin-right: auto; margin-bottom: 1.6rem;
+}
+.level p:has(> img[src$="#center"]) img + em { text-align: center; }
+.level p:has(> img[src$="#left"]) img + em,
+.level p:has(> img[src$="#right"]) img + em,
+.level p:has(> img[src$="#center"]) img + em { max-width: none; font-size: .84rem; }
+.level pre {
+  margin: 1.7rem 0; padding: 1rem 1.15rem; overflow-x: auto;
+  background: var(--raised); border: 1px solid var(--rule); border-radius: 8px;
+  font: 400 .84rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink-2); tab-size: 2;
+}
+.level pre code {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit;
+}
+.level code {
+  font: 400 .86em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--chip);
+  border-radius: 4px; padding: .1em .32em;
+}
+.level hr { border: 0; border-top: 1px solid var(--rule); margin: 2.4rem 0; }
+.level strong { color: var(--ink); font-weight: 600; }
+/* A block held between ::: center and ::: sits in the middle: the text, and a
+   picture with it. The picture keeps the half width the #center path gives it,
+   so the two ways of centring do not fight. */
+.level .center { text-align: center; }
+.level .center > * { margin-left: auto; margin-right: auto; }
+.level .center img { display: block; margin-left: auto; margin-right: auto; }
+.level .center ul, .level .center ol { list-style-position: inside; padding-left: 0; }
+.level .center blockquote { border-left: 0; padding-left: 0; }
+
+/* a link in the prose carries the accent, so it is seen without a hover. The
+   underline stays quiet until the pointer is on it. */
+/* a link in the prose is known by its colour alone; the hover lifts it */
+.level a { color: var(--accent); text-decoration: none; }
+.level a:hover { color: color-mix(in srgb, var(--accent) 70%, white); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation: none !important; }
+  .level, .level > *, .w { filter: none !important; transform: none !important; }
+  /* with no animation to carry it away, the old text must go at once */
+  .level.is-leaving { opacity: 0 !important; visibility: hidden !important; }
+}
+
+/* ---------- small screens ---------- */
+/* a thumb needs something to aim at, and display type needs fewer words */
+@media (max-width: 620px) {
+  /* the same trick on a phone, where the visible strip is already taller */
+  .range { height: 4.2rem; margin-block: -0.8rem; }
+  .theme { padding: .5rem .95rem; min-height: 2.75rem; }
+  .level.is-active[data-k="sentence"] p { font-size: 1.11em; }
+  .level p img + em { max-width: none; }
+  /* too narrow to set text beside a picture */
+  .level p:has(> img[src$="#left"]),
+  .level p:has(> img[src$="#right"]),
+  .level p:has(> img[src$="#center"]) {
+    float: none; width: 100%; max-width: 100%; margin-left: 0; margin-right: 0;
+  }
+}
+
+/* ---------- the lightbox ---------- */
+/* A click on a picture in a post opens it over the page. Nothing else is on
+   screen: a dark ground, the picture, its caption, and one way out. */
+.js .level img { cursor: zoom-in; }
+.js .level img:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px;
+}
+/* the page behind must not scroll while the picture is open */
+html.lb-open, html.lb-open body { overflow: hidden; }
+
+.lb {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 3.5rem 1.5rem 2rem;
+  /* Opaque, not nearly opaque. Even a few percent lets the page behind show
+     through, and in the dark the eye picks that ghost text out at once. */
+  background: #0a0908;
+  /* the picture keeps its own light, whatever the theme of the page */
+  color: #ece8e0;
+  /* No fade. The overlay covers the whole page and takes every click, so its
+     one job is to be solid the moment it opens. A fade puts that behind an
+     animation, and a browser that runs no animation frame would then leave a
+     layer the reader cannot see but cannot click through either. */
+}
+.lb[hidden] { display: none; }
+
+.lb-body {
+  margin: 0; display: flex; flex-direction: column; align-items: center;
+  gap: .9rem; max-height: 100%;
+}
+.lb-pic {
+  display: block; max-width: 92vw; max-height: 82vh;
+  width: auto; height: auto; object-fit: contain;
+  border-radius: 3px; cursor: zoom-out;
+}
+.lb-cap {
+  margin: 0; max-width: 38rem; text-align: center;
+  font: italic 400 .9rem/1.55 var(--sans); color: #a8a49b;
+}
+.lb-cap[hidden] { display: none; }
+
+.lb-x {
+  position: absolute; top: .9rem; right: 1.1rem;
+  width: 2.5rem; height: 2.5rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; border-radius: 50%;
+  font: 400 1.7rem/1 var(--sans); color: #a8a49b;
+  cursor: pointer; transition: color .15s var(--ease), background .15s var(--ease);
+}
+.lb-x:hover { color: #ece8e0; background: rgba(255, 255, 255, .09); }
+.lb-x:focus-visible { outline: 2px solid #ece8e0; outline-offset: 2px; }
+
+@media (max-width: 620px) {
+  .lb { padding: 3.25rem 1rem 1.5rem; }
+  .lb-pic { max-width: 100%; max-height: 76vh; }
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About me · Four Depths</title>
+<meta name="description" content="A blog that lets you choose how deep you read: one sentence, one paragraph, three paragraphs, one page, three pages.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2213%22 font-size=%2214%22>◐</text></svg>">
+<script>
+  
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site">
+  <a class="wordmark" href="/">Four&nbsp;Depths</a>
+  <button id="theme" class="theme" type="button" aria-label="Change the theme">
+    <span class="dot" aria-hidden="true"></span><span class="theme-name">auto</span>
+  </button>
+</header>
+
+<main>
+
+<article class="post" id="post">
+  <p class="crumb"><a href="/">← all posts</a></p>
+  <h1>About me</h1>
+  
+
+  
+  <div class="depth" id="depth">
+    <div class="depth-row">
+      <button class="step" id="shorter" type="button" aria-label="A shorter depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
+      </button>
+      <input id="range" class="range" type="range" min="0" max="3" step="any" value="0"
+             aria-label="Reading depth" list="stops">
+      <button class="step" id="longer" type="button" aria-label="A longer depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
+      </button>
+      <datalist id="stops"><option value="0" label="Sentence" data-w="9" data-r="0.1 min"></option><option value="1" label="Paragraph" data-w="41" data-r="0.2 min"></option><option value="2" label="Short" data-w="77" data-r="0.5 min"></option><option value="3" label="Medium" data-w="3" data-r="0.0 min"></option></datalist>
+    </div>
+    <p class="now"><span id="now"><span class="lbl">Sentence</span><span class="wc">9 words · 0.1 min</span></span></p>
+  </div>
+  
+
+  <div class="levels" id="levels">
+    
+    <section class="level is-active" data-i="0" data-k="sentence"
+             aria-label="Sentence" aria-hidden="false"><p>i am a dad and husband who writes code</p>
+</section>
+    
+    <section class="level" data-i="1" data-k="paragraph"
+             aria-label="Paragraph" aria-hidden="true" hidden><p>i am a dad to two amazing kids and a husband to a beautiful and supportive wife. i am a software engineer who writes code. currently living in the bay area. in my free time i like to play board games.</p>
+</section>
+    
+    <section class="level" data-i="2" data-k="paragraphs"
+             aria-label="Short" aria-hidden="true" hidden><p>i am a dad to two amazing kids and a husband to a beautiful and supportive wife. i also have two dogs, two cats, and two chickens.</p>
+<p>i am a software engineer who writes code. currently living in the bay area. i&rsquo;ve solved problems in a bunch of different languages, but i keep coming back to ruby.</p>
+<p>in my free time i like to play board games. some of my favorite games are arc nova  and wingspan.</p>
+</section>
+    
+    <section class="level" data-i="3" data-k="page"
+             aria-label="Medium" aria-hidden="true" hidden><h2>Two pages</h2>
+</section>
+    
+  </div>
+</article>
+
+</main>
+
+<footer class="site">
+  <p>2026</p>
+</footer>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

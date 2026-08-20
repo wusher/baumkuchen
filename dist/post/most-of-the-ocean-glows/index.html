@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Most Of The Ocean Glows · Four Depths</title>
+<meta name="description" content="A blog that lets you choose how deep you read: one sentence, one paragraph, three paragraphs, one page, three pages.">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><text y=%2213%22 font-size=%2214%22>◐</text></svg>">
+<script>
+  
+  try {
+    var t = localStorage.getItem('theme');
+    if (t) document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+</head>
+<body>
+<header class="site">
+  <a class="wordmark" href="/">Four&nbsp;Depths</a>
+  <button id="theme" class="theme" type="button" aria-label="Change the theme">
+    <span class="dot" aria-hidden="true"></span><span class="theme-name">auto</span>
+  </button>
+</header>
+
+<main>
+
+<article class="post" id="post">
+  <p class="crumb"><a href="/">← all posts</a></p>
+  <h1>Most Of The Ocean Glows</h1>
+  
+  <p class="meta">
+    
+    
+    <span class="tag">biology</span>
+    <span>3 Aug 2026</span>
+    
+  </p>
+  
+
+  
+  <div class="depth" id="depth">
+    <div class="depth-row">
+      <button class="step" id="shorter" type="button" aria-label="A shorter depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
+      </button>
+      <input id="range" class="range" type="range" min="0" max="4" step="any" value="0"
+             aria-label="Reading depth" list="stops">
+      <button class="step" id="longer" type="button" aria-label="A longer depth">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
+      </button>
+      <datalist id="stops"><option value="0" label="Sentence" data-w="34" data-r="0.2 min"></option><option value="1" label="Paragraph" data-w="97" data-r="0.6 min"></option><option value="2" label="Short" data-w="318" data-r="1.9 min"></option><option value="3" label="Medium" data-w="503" data-r="3.0 min"></option><option value="4" label="Long" data-w="1187" data-r="7.2 min"></option></datalist>
+    </div>
+    <p class="now"><span id="now"><span class="lbl">Sentence</span><span class="wc">34 words · 0.2 min</span></span></p>
+  </div>
+  
+
+  <div class="levels" id="levels">
+    
+    <section class="level is-active" data-i="0" data-k="sentence"
+             aria-label="Sentence" aria-hidden="false"><p>Below a few hundred metres the water is permanently black, and roughly <strong>three quarters</strong> of the animals make their own light: bioluminescence is not an oddity of the deep sea but its ordinary condition.</p>
+</section>
+    
+    <section class="level" data-i="1" data-k="paragraph"
+             aria-label="Paragraph" aria-hidden="true" hidden><p>Surveys off California, counting every animal a submersible saw from the surface to 4000 metres, found that about <strong>76%</strong> can produce light. The figure holds at every depth, which makes the glow standard equipment for the largest habitat on Earth rather than a specialisation of the deepest trenches. The chemistry is nearly always the same in outline: a small molecule called a <em>luciferin</em> is oxidised by an enzyme, and the energy comes out as a photon instead of heat. The uses are various — lures, alarms, camouflage, private searchlights, sexual signals, and pouches of farmed glowing bacteria.</p>
+</section>
+    
+    <section class="level" data-i="2" data-k="paragraphs"
+             aria-label="Short" aria-hidden="true" hidden><p>Below a few hundred metres the ocean is permanently black, and roughly three quarters of the animals there make their own light. The reaction is elegantly simple: a <strong>luciferin</strong> reacts with oxygen under the control of a <strong>luciferase</strong>, and drops from an excited state by emitting a photon rather than shedding heat. Some luciferases turn nearly half the reaction&rsquo;s energy into light, which is why it is called <em>cold light</em>. The trick has evolved at least <strong>90 separate times</strong>. Many animals do not even make their own fuel: coelenterazine passes up the food chain from small crustaceans to the fish that eat them.</p>
+<p>Almost all of it is blue, and for a good physical reason. Seawater is most transparent to light around 470–490 nanometres, so blue-green travels furthest, and deep-sea eyes have converged on visual pigments tuned to exactly that band. This creates an equilibrium that a few animals have learned to break. The stoplight loosejaw, a small dragonfish, emits deep red light from an organ under its eye — invisible to virtually every other animal down there — and sees by it using a retinal pigment derived from chlorophyll in its diet. It is hunting with a private searchlight, in a room where everyone else is colour-blind to red.</p>
+<p>What the light is <em>for</em> depends on who is using it. Counterillumination is probably the commonest use: an animal covered in ventral photophores matches the faint downwelling glow above it, erasing its silhouette from the view of predators looking up. Anglerfish dangle a lure full of symbiotic bacteria. Threatened jellyfish fire off spinning blue pinwheels that function as burglar alarms, advertising the presence of an attacker to something larger that might eat it. Deep-sea squid squirt clouds of luminous mucus instead of ink. And ostracods the size of a sesame seed spit trains of glowing droplets into the water in species-specific patterns, courting in a code of light.</p>
+</section>
+    
+    <section class="level" data-i="3" data-k="page"
+             aria-label="Medium" aria-hidden="true" hidden><p><strong>The chemistry</strong></p>
+<p>Bioluminescence is a chemiluminescent reaction that biology has domesticated. In general terms: luciferin + O₂, catalysed by luciferase, yields oxidised luciferin, water or CO₂, and a photon. Because the excited product relaxes by emission rather than by collision, almost none of the energy is lost as heat. Firefly luciferase converts around 40% of its chemical energy into light; an incandescent bulb manages about 5%.</p>
+<p>There is no single luciferin. At least a dozen chemically unrelated ones are known: firefly luciferin, bacterial luciferin (a reduced flavin plus a long-chain aldehyde), dinoflagellate luciferin derived from chlorophyll, and above all coelenterazine, used by jellyfish, comb jellies, shrimp, squid and many fish. Some animals synthesise their own; many steal it. Remove coelenterazine from the diet of certain fish and they go dark.</p>
+<p><strong>Renting the light</strong></p>
+<p>The other route is symbiosis. In the Hawaiian bobtail squid, a specialised light organ is colonised within hours of hatching by <em>Vibrio fischeri</em> from the surrounding seawater, selected out of thousands of bacterial species by a chemical filter the squid provides. The bacteria only switch on their light genes when their density is high enough — quorum sensing, first worked out in this very system — and the squid, which hunts at night in shallow water, uses them to counterilluminate against the moon. Each dawn it vents most of the culture and lets it regrow during the day.</p>
+<p>Anglerfish do the same thing in far deeper water, with bacteria whose genomes have decayed so far that they can barely live independently. The lure at the end of the fish&rsquo;s modified dorsal spine is a bacterial farm at the end of a fishing rod.</p>
+<p><strong>What it is used for</strong></p>
+<p><em>Camouflage.</em> Ventral photophores tuned in brightness and colour to the light filtering down from above, erasing the shadow that a predator below would otherwise see. Hatchetfish are the classic case, and some do it well enough to track changes in surface brightness.</p>
+<p><em>Attraction.</em> Anglerfish lures, and the glowing barbels of dragonfish, drawing prey to a mouth.</p>
+<p><em>Defence.</em> The burglar alarm: an attacked jellyfish or dinoflagellate flashes brightly, making its attacker conspicuous to a larger predator, so that eating this particular prey becomes dangerous. Also decoys — luminous mucus, detachable glowing body parts, and clouds of light released in place of ink.</p>
+<p><em>Communication.</em> Ostracod courtship displays in the Caribbean, in which males release species-specific sequences of glowing droplets while females watch, and flashlight fish that shutter light organs under their eyes with a movable flap of skin.</p>
+<p><strong>And a side effect that changed biology</strong></p>
+<p>In 1962, Osamu Shimomura isolated from a Pacific jellyfish a protein that glows blue in the presence of calcium, and alongside it a second protein that absorbed that blue and re-emitted it green. The second one was green fluorescent protein. Spliced into other organisms&rsquo; genomes as a tag, GFP made it possible to watch specific proteins move inside living cells, and earned a Nobel Prize in 2008. A jellyfish&rsquo;s private signalling system became the standard lamp of molecular biology.</p>
+</section>
+    
+    <section class="level" data-i="4" data-k="pages"
+             aria-label="Long" aria-hidden="true" hidden><h2>The dark is the habitat</h2>
+<p>It is easy to forget the geometry of the ocean. The sunlit surface layer is at most 200 metres deep, and average ocean depth is 3700 metres. By volume, well over 90% of the biosphere is dark, cold water — the largest continuous living space on the planet, and one in which vision still works, because it is not entirely lightless.</p>
+<p>Two sources of light exist down there. The first is residual sunlight, which fades exponentially and, filtered by water, narrows to a blue band. It is detectable by sensitive eyes down to perhaps 1000 metres. The second is biological, and below that depth it is the only light there is.</p>
+<p>Animals living in this environment face a peculiar problem set. Prey is sparse, so encounters are rare and must be exploited. There is nowhere to hide — no rocks, no plants, no shadows — except in the dark itself. And any light you emit is visible from very far away in exceptionally clear water. Under those conditions, controlling photons is as fundamental as controlling body temperature is on land.</p>
+<h2>Ninety inventions of the same thing</h2>
+<p>Bioluminescence is a textbook case of convergent evolution. Current estimates put the number of independent origins at around 90 or more across the tree of life — separate lineages that each stumbled into the same solution using different chemistry.</p>
+<p>Why so often? A plausible answer is that the raw material was already present. Oxygen is chemically aggressive, and early aerobic life needed enzymes to detoxify reactive oxygen species. Some of those reactions produce excited-state intermediates that can, incidentally, emit light. An oxygen-detoxifying enzyme that happens to glow faintly is one mutation away from a signal, if a signal happens to be useful. Several luciferases are demonstrably related to oxygenases and to proteins with no luminous function at all, which supports the idea that light is a repurposed by-product of oxygen chemistry.</p>
+<p>Marine luciferins reinforce the picture of a shared chemical economy. Coelenterazine appears in nine different phyla, but the genes to make it are far rarer than the ability to use it — it moves through food webs. A copepod eats it, a shrimp eats the copepod, a lanternfish eats the shrimp, and each stores the molecule for its own purposes with its own luciferase. It behaves less like a private adaptation than like a vitamin.</p>
+<h2>Optics, not just chemistry</h2>
+<p>Producing photons is only half the problem; aiming them is the other half. Deep-sea photophores are proper optical instruments. They contain a chamber of light-producing cells or bacteria, a reflective layer of guanine crystals behind it, a lens of transparent tissue in front, colour filters to tune the emission, and pigment screens or muscular shutters to control the beam. Some are steerable. Some are connected to the animal&rsquo;s own light sensors in a feedback loop, so that the brightness of the belly automatically matches the brightness of the water above.</p>
+<p>Counterillumination demands this precision. A predator looking upward sees prey as a black shape against a dim blue-grey ceiling. To vanish, the prey must match the ceiling in intensity, in spectrum, and in angular distribution — too bright and it becomes a beacon, too dim and it remains a silhouette. Experiments with hatchetfish in graded light show them adjusting their output within seconds. The cookiecutter shark seems to take this further: it counterilluminates its whole underside except for a dark collar, which may present, to something looking up, the silhouette of a very small fish — a lure made of shadow, attached to a shark that takes a cookie-shaped bite out of whatever comes to investigate.</p>
+<h2>The alarm system</h2>
+<p>The most counterintuitive use of light is to make yourself visible. When a dinoflagellate is jostled by a swimming copepod, it flashes. When an <em>Atolla</em> jellyfish is seized, it fires a rotating display of blue light, bright and rhythmic, visible for tens of metres.</p>
+<p>The burglar alarm hypothesis explains why. A flash does not deter the immediate attacker; it advertises the attacker&rsquo;s position to whatever eats <em>it</em>. Laboratory work supports this rather neatly: fish are more likely to strike at copepods that have been surrounded by flashing dinoflagellates, and copepods, in turn, feed less in luminous water. The signal changes the behaviour of the whole local food web.</p>
+<p>The idea has been put to practical use. A simple ring of blue LEDs imitating the <em>Atolla</em> display, lowered into deep water on a camera rig, was the technique that captured the first video of a live giant squid — an animal that had defeated decades of conventional searching. Researchers essentially rang a dinner bell in a language the deep sea already understood.</p>
+<h2>Bacteria that vote</h2>
+<p>The symbiotic route to light produced one of modern microbiology&rsquo;s foundational discoveries. Free-living <em>Vibrio fischeri</em> in seawater are dark. Packed at high density inside a squid&rsquo;s light organ, they glow. The mechanism is quorum sensing: each cell continuously releases a small signalling molecule, and each cell has a receptor for it. At low density the molecule diffuses away; at high density it accumulates until receptor binding crosses a threshold and switches on the <em>lux</em> operon, which encodes the luciferase and the enzymes that supply its aldehyde substrate.</p>
+<p>The insight — that bacteria measure their own population and coordinate gene expression collectively — turned out to govern biofilms, virulence and antibiotic production across the bacterial world. It was discovered in a two-inch squid that wanted to hide its shadow from the moon.</p>
+<p>The partnership is remarkably specific. The juvenile squid recruits its bacteria from ambient seawater within hours of hatching, using mucus and chemical cues that admit <em>V. fischeri</em> and reject nearly everything else. Colonisation triggers developmental changes in the squid&rsquo;s light organ; the light organ, in turn, provides amino acids and sugars. Each morning the squid expels roughly 95% of the culture, and the remainder regrows by evening. Anglerfish symbionts have gone further down the same path, losing so many genes that they appear unable to complete a life cycle outside their host — bacteria on their way to becoming organelles.</p>
+<h2>Seen from orbit</h2>
+<p>Occasionally the effect scales up beyond anything else in biology. Sailors have reported &ldquo;milky seas&rdquo; for centuries: nights when the ocean surface glows a steady, uniform white to the horizon, bright enough to read by, lasting for days. Unlike the sparkling flashes of disturbed dinoflagellates, milky seas glow continuously and are not triggered by waves.</p>
+<p>They are almost certainly vast blooms of luminous bacteria — <em>Vibrio harveyi</em> and relatives — quorum-sensing in concert across areas larger than some countries. Satellite instruments sensitive enough to see them have now confirmed several events, one covering over 100,000 square kilometres in the Indian Ocean and persisting for more than a week. A single ship sailed into one in 1985 and collected a water sample, which is still nearly the only direct measurement anyone has.</p>
+<p>It is a fair summary of the whole subject: the most common form of communication on Earth, running continuously across the largest habitat there is, and we have sampled it roughly once.</p>
+</section>
+    
+  </div>
+</article>
+
+</main>
+
+<footer class="site">
+  <p>2026</p>
+</footer>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

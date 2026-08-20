@@ -1,0 +1,40 @@
+{{define "card"}}
+  <li class="card">
+    <a href="/post/{{.Slug}}">
+      <h2>{{.Title}}</h2>
+    </a>
+    {{if or .Draft (not .Pinned)}}
+    <p class="meta">
+      {{if .Draft}}<span class="draft">draft</span>{{end}}
+      {{if not .Pinned}}
+      {{if .Tag}}<span class="tag">{{.Tag}}</span>{{end}}
+      {{if .DateText}}<span>{{.DateText}}</span>{{end}}
+      <span>{{len .Levels}} depth{{if ne (len .Levels) 1}}s{{end}} · {{.WordRange}} words</span>
+      {{end}}
+    </p>
+    {{end}}
+  </li>
+{{end}}
+
+{{define "main"}}
+<section class="intro">
+  <h1></h1>
+  <p></p>
+</section>
+
+{{if .Pinned}}
+<p class="eyebrow pages">pages</p>
+<ol class="feed pinned">
+  {{range .Pinned}}{{template "card" .}}{{end}}
+</ol>
+{{if .Posts}}<hr class="split">{{end}}
+{{end}}
+
+{{if .Posts}}<p class="eyebrow posts">posts</p>{{end}}
+<ol class="feed">
+  {{range .Posts}}{{template "card" .}}{{else}}
+  {{if not .Pinned}}<li class="card"><p class="lead">No post carries a depth yet.</p></li>{{end}}
+  {{end}}
+</ol>
+
+{{end}}

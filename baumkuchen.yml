@@ -1,0 +1,22 @@
+# The settings for this site. Every one of them has a working default, so this
+# file can be short, or missing altogether. A flag beats what is written here:
+#
+#   make run                     # the address below
+#   go run . -addr :3000         # this once, on another port
+
+# the name of the site, in the tab and as the wordmark
+title: Four Depths
+
+# the folder the markdown is read from. It is a symlink here: the posts live
+# outside this repository. See `make link`.
+posts: posts
+
+# where `make export` writes the built site
+dist: dist
+
+# the folder the built site is published in. A GitHub project page is served
+# from /the-repo/; leave this empty for a custom domain or a user site.
+base: /baumkuchen
+
+# where the server listens
+addr: :8080

@@ -15,7 +15,26 @@ has. New words fill the page as the text grows, and drain away as it shrinks.
     make lint      # repair the format, then vet
     make build     # a single binary, templates and assets included
 
-Flags: `-addr :8080`, `-posts posts`, `-export dist`.
+## The settings
+
+`baumkuchen.yml`, at the top of the tree. Every setting has a working default,
+so the file can be short, or missing altogether.
+
+    title: Four Depths     # the tab, and the wordmark
+    posts: posts           # where the markdown is read from
+    dist:  dist            # where the built site is written
+    base:  /baumkuchen     # the folder it is published in; empty for the root
+    addr:  :8080           # where the server listens
+
+A flag beats the file, and only a flag you actually gave:
+
+    go run . -addr :3000            # this once, on another port
+    go run . -title "Something Else"
+    go run . -config other.yml
+
+A key that is not a setting stops the run and names itself, because a typo
+that is swallowed is a setting that quietly does nothing. The Makefile reads
+the folders out of the same file, so there is one place to change them.
 
 ## The publishing rule
 
@@ -217,9 +236,22 @@ deploy:
     dist/static/style.css   app.js
     dist/media/*
 
-A draft never reaches it, and neither does a file with no depth. The build
-**never deletes**: it makes the folder and writes over what is there. Removing
-an old build is a separate step, on purpose.
+A draft never reaches it, and neither does a file with no depth. `make export`
+empties the folder first, so a post you renamed leaves no page behind; the Go
+code itself deletes nothing, and the `rm` sits on the line that does it.
+
+### The folder the site is published in
+
+Every link the site writes starts at the root, because that is where the server
+answers. A GitHub **project page** is served from a folder — this one is at
+`/baumkuchen/` — so the build puts that folder in front of each link:
+
+    BASE ?= /baumkuchen
+
+Leave `BASE` empty for a custom domain or a user site, both of which are served
+from the root. Only `href="/…"` and `src="/…"` are touched, so an address with
+a scheme, or one that starts `//`, is left alone. The running server ignores
+`BASE` altogether: `make run` always answers at the root.
 
 ## depth
 

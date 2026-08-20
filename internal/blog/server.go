@@ -21,6 +21,12 @@ type Config struct {
 	Posts     string // the folder with the markdown
 	Templates fs.FS  // holds templates/*.html
 	Static    fs.FS  // holds static/*
+	// Base is the folder the built site is published in, if it is not the
+	// root: "/baumkuchen" for a GitHub project page. The running server
+	// always answers at the root and ignores this.
+	Base string
+	// Title is the name of the site.
+	Title string
 }
 
 // Site is one blog: the posts it has read, and the pages it can write.
@@ -29,6 +35,8 @@ type Site struct {
 	pages  map[string]*template.Template
 	posts  string
 	static fs.FS
+	base   string
+	title  string
 }
 
 // New reads the posts folder and builds the pages.
@@ -38,6 +46,8 @@ func New(cfg Config) (*Site, error) {
 		pages:  buildPages(cfg.Templates),
 		posts:  cfg.Posts,
 		static: cfg.Static,
+		base:   cleanBase(cfg.Base),
+		title:  cfg.Title,
 	}
 	if err := s.store.Refresh(); err != nil {
 		return nil, fmt.Errorf("read posts: %w", err)
@@ -62,7 +72,9 @@ type pageData struct {
 	Posts  []*Post
 	// Color is the accent of the page being shown, if it asked for one.
 	Color string
-	Year  int
+	// Site is the name of the whole site, for the tab and the wordmark.
+	Site string
+	Year int
 }
 
 // buildPages joins each page to the layout in its own template set,
@@ -114,6 +126,7 @@ func (s *Site) reload() {
 // a page cannot come out one way on screen and another way in the folder.
 func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	data.Year = time.Now().Year()
+	data.Site = s.title
 	t, ok := s.pages[name]
 	if !ok {
 		return fmt.Errorf("no page named %s", name)
@@ -136,7 +149,7 @@ func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	s.reload()
 	pinned, rest := splitPinned(s.store.Index())
 	s.render(w, "index.html", pageData{
-		Title:  "Four depths",
+		Title:  s.title,
 		Pinned: pinned,
 		Posts:  rest,
 	})

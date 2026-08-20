@@ -172,3 +172,94 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+// A site published in a folder gets that folder in front of every link it
+// wrote, and in front of nothing else.
+func TestBasePath(t *testing.T) {
+	// arrange
+	page := []byte(`<a href="/">home</a> <link href="/static/style.css">` +
+		`<img src="/media/x.jpg"> <a href="https://example.com/x">out</a>` +
+		` <a href="//cdn.example.com/y">other host</a> <a href="/post/one">a post</a>`)
+
+	// act
+	got := string(withBase(page, "/baumkuchen"))
+	untouched := string(withBase(page, ""))
+
+	// assert
+	for _, want := range []string{
+		`href="/baumkuchen/"`,
+		`href="/baumkuchen/static/style.css"`,
+		`src="/baumkuchen/media/x.jpg"`,
+		`href="/baumkuchen/post/one"`,
+		`href="https://example.com/x"`, // a scheme is left alone
+		`href="//cdn.example.com/y"`,   // another host is left alone
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %s from\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "/baumkuchen/baumkuchen") || strings.Contains(got, `="//baumkuchen`) {
+		t.Errorf("the folder was written twice or oddly:\n%s", got)
+	}
+	if untouched != string(page) {
+		t.Error("with no folder given, the page must come back as it was")
+	}
+}
+
+// The folder is tidied, whatever shape it arrives in.
+func TestCleanBase(t *testing.T) {
+	// arrange
+	cases := map[string]string{
+		"/baumkuchen":  "/baumkuchen",
+		"baumkuchen":   "/baumkuchen",
+		"/baumkuchen/": "/baumkuchen",
+		" /blog/ ":     "/blog",
+		"/":            "",
+		"":             "",
+	}
+
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			// act
+			got := cleanBase(in)
+
+			// assert
+			if got != want {
+				t.Errorf("cleanBase(%q) = %q, want %q", in, got, want)
+			}
+		})
+	}
+}
+
+// The whole build carries the folder, and the pages still find each other.
+func TestExportUnderAFolder(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	root := os.DirFS("../..")
+	site, err := New(Config{Posts: dir, Templates: root, Static: root, Base: "baumkuchen/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+
+	// act
+	if _, err := site.Export(out); err != nil {
+		t.Fatal(err)
+	}
+	index := readFile(t, filepath.Join(out, "index.html"))
+	post := readFile(t, filepath.Join(out, "post", "one", "index.html"))
+
+	// assert
+	for _, want := range []string{`href="/baumkuchen/static/style.css"`, `href="/baumkuchen/post/one"`} {
+		if !strings.Contains(index, want) {
+			t.Errorf("the index is missing %s", want)
+		}
+	}
+	if !strings.Contains(post, `href="/baumkuchen/"`) {
+		t.Error("the post cannot find its way home")
+	}
+	if strings.Contains(index, `href="/static`) || strings.Contains(index, `href="/post`) {
+		t.Error("a link was left at the root")
+	}
+}

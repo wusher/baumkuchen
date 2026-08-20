@@ -1,7 +1,10 @@
 BINARY := baumkuchen
-DIST   ?= dist
-PORT   ?= 8080
-POSTS  ?= posts
+CONFIG ?= baumkuchen.yml
+# every setting lives in $(CONFIG); these read it, so there is one place to
+# change a folder or a name. Give one on the command line to override it:
+#   make export DIST=out
+DIST   ?= $(shell awk '$$1=="dist:" {print $$2}' $(CONFIG))
+POSTS  ?= $(shell awk '$$1=="posts:" {print $$2}' $(CONFIG))
 
 .PHONY: help setup link build run lint check test cover clean new audit export stats
 
@@ -16,8 +19,8 @@ setup: ## Link the posts folder, then download and verify the Go modules
 build: ## Compile the server into ./$(BINARY)
 	go build -trimpath -o $(BINARY) .
 
-run: ## Start the server on http://localhost:$(PORT)
-	go run . -addr :$(PORT) -posts $(POSTS)
+run: ## Start the server, on the address in $(CONFIG)
+	go run .
 
 lint: ## Repair the format, then report what is left
 	gofmt -w -s .
@@ -46,7 +49,7 @@ export: ## Build the static site into ./$(DIST), with no draft in it
 	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
 		echo "export: refusing to empty '$(DIST)'"; exit 1;; esac
 	rm -rf $(DIST)
-	go run . -posts $(POSTS) -export $(DIST)
+	go run . -export $(DIST)
 
 link: ## Point ./posts at the folder where the posts live
 	@POSTS=$(POSTS) scripts/link-posts.sh $(TO)

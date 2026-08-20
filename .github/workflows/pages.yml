@@ -1,0 +1,48 @@
+# Publish the built site to GitHub Pages.
+#
+# The site is built on your own machine, because the posts live outside this
+# repository behind a symlink that only exists there. `make export` writes
+# ./dist and that folder is committed; this workflow only publishes it.
+name: pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'dist/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# one deploy at a time, and never cancel one that is half done
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # a missing or empty dist means someone forgot `make export`; say so
+      # here rather than publishing an empty site
+      - name: Check the build is there
+        run: |
+          test -f dist/index.html || { echo "dist/index.html is missing: run 'make export' and commit it"; exit 1; }
+          pages=$(find dist -name index.html | wc -l)
+          echo "publishing $pages page(s), $(du -sh dist | cut -f1)"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -46,8 +46,10 @@ done
 files=("${args[@]+"${args[@]}"}")
 if [ ${#files[@]} -eq 0 ]; then
   # -L, because POSTS may be a symlink to a folder kept somewhere else, and
-  # find does not follow a linked starting point on its own
-  mapfile -t files < <(find -L "$POSTS" -maxdepth 1 -name '*.md' | sort)
+  # find does not follow a linked starting point on its own. Every folder is
+  # read, apart from the pictures and anything hidden.
+  mapfile -t files < <(find -L "$POSTS" \
+    \( -name images -o -name '.*' \) -prune -o -name '*.md' -print | sort)
 fi
 
 # ---- the colours ----
@@ -162,6 +164,8 @@ while IFS= read -r f; do
   fm="$(awk 'NR==1 && /^---/ {fm=1; next} fm && /^---/ {exit} fm' "$f")"
   is_draft=0; is_pinned=0
   printf '%s\n' "$fm" | grep -qiE '^draft:[[:space:]]*(true|yes|on|1)[[:space:]]*$'  && is_draft=1
+  # a folder whose name starts with _ holds it back, whatever the file says
+  case "/${f#"$POSTS"/}" in */_*/*) is_draft=1 ;; esac
   printf '%s\n' "$fm" | grep -qiE '^pinned:[[:space:]]*(true|yes|on|1)[[:space:]]*$' && is_pinned=1
   [ "$is_draft" = 1 ] && drafts_n=$((drafts_n + 1))
 
@@ -288,7 +292,10 @@ while IFS= read -r f; do
   tc="$TITLE"
   [ "$f_warn" -gt 0 ] && tc="$WARNC"
   [ "$f_err"  -gt 0 ] && tc="$ERRC"
+  # the folder a file sits in is part of what it is, so the row shows it
+  where="${f#"$POSTS"/}"; where="$(dirname "$where")"
   short_title="$title"
+  [ "$where" != "." ] && short_title="$where/$title"
   [ ${#short_title} -gt 30 ] && short_title="${short_title:0:29}…"
 
   cell() {

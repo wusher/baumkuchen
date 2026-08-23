@@ -1,6 +1,7 @@
 package blog
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -176,5 +177,81 @@ func TestRefreshOnlyRereadsWhenAFileChanged(t *testing.T) {
 	}
 	if got := len(s.Index()); got != 2 {
 		t.Errorf("index holds %d, want 2 after a file was added", got)
+	}
+}
+
+// The store reads every folder under the posts root, and anything in a folder
+// whose name starts with an underscore is a draft, whatever it says.
+func TestFoldersAndHeldBackDrafts(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	for _, d := range []string{"posts", "_drafts", "images", ".hidden"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	postFile(t, dir, "top.md", "---\ndate: 2026-01-05\n---\n", "Top")
+	postFile(t, filepath.Join(dir, "posts"), "nested.md", "---\ndate: 2026-01-04\n---\n", "Nested")
+	postFile(t, filepath.Join(dir, "_drafts"), "held.md", "---\ndate: 2026-01-03\n---\n", "Held")
+	// it says it is ready; the folder says otherwise
+	postFile(t, filepath.Join(dir, "_drafts"), "loud.md", "---\ndate: 2026-01-02\ndraft: false\n---\n", "Loud")
+	postFile(t, filepath.Join(dir, ".hidden"), "unseen.md", "---\ndate: 2026-01-01\n---\n", "Unseen")
+	write(t, filepath.Join(dir, "images"), "notes.md", "# Not A Post\n\n# Sentence\n\nignore me.\n")
+	s := NewStore(dir)
+
+	// act
+	err := s.Refresh()
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := slugs(s.Published()); strings.Join(got, ",") != "top,nested" {
+		t.Errorf("published = %v, want [top nested]", got)
+	}
+	if got := slugs(s.Drafts()); strings.Join(got, ",") != "held,loud" {
+		t.Errorf("drafts = %v, want both files under _drafts", got)
+	}
+	for _, slug := range []string{"unseen", "notes"} {
+		if _, ok := s.Get(slug); ok {
+			t.Errorf("%s was read from a folder that must be stepped over", slug)
+		}
+	}
+	// a held back file still answers at its own URL while the server runs
+	if _, ok := s.Get("held"); !ok {
+		t.Error("a draft must still be readable locally")
+	}
+}
+
+// Two files of the same name in different folders would answer at one URL.
+// The first keeps it, and the store says so rather than picking in silence.
+func TestSameNameInTwoFolders(t *testing.T) {
+	// arrange
+	// the walk is alphabetical by path, so a/ is read before b/
+	dir := t.TempDir()
+	for _, d := range []string{"a", "b"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	postFile(t, filepath.Join(dir, "a"), "twice.md", "---\ndate: 2026-01-01\n---\n", "First")
+	postFile(t, filepath.Join(dir, "b"), "twice.md", "---\ndate: 2026-01-02\n---\n", "Second")
+	s := NewStore(dir)
+
+	// act
+	if err := s.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	p, ok := s.Get("twice")
+
+	// assert
+	if !ok {
+		t.Fatal("the slug must still answer")
+	}
+	if p.Title != "First" {
+		t.Errorf("the URL went to %q, want the first in the walk", p.Title)
+	}
+	if got := len(s.Index()); got != 1 {
+		t.Errorf("the index holds %d, want 1: the other file is not shown twice", got)
 	}
 }

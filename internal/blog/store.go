@@ -4,6 +4,8 @@ package blog
 
 import (
 	"fmt"
+	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,21 +31,73 @@ func NewStore(dir string) *Store {
 	return &Store{dir: dir, bySlug: map[string]*Post{}}
 }
 
+// root gives the folder to read, with any symlink resolved. The posts often
+// live outside the repository, with ./posts pointing at them, and a walk does
+// not follow a link at its starting point.
+func (s *Store) root() string {
+	if resolved, err := filepath.EvalSymlinks(s.dir); err == nil {
+		return resolved
+	}
+	return s.dir
+}
+
+// markdown gives every .md file under the root, in order, with the path each
+// one was found at. The pictures folder is stepped over, and so is anything
+// hidden: a folder a person cannot see is not one they meant to publish from.
+func (s *Store) markdown() ([]string, error) {
+	var out []string
+	root := s.root()
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if path == root {
+				return nil
+			}
+			if name == "images" || strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.EqualFold(filepath.Ext(name), ".md") {
+			out = append(out, path)
+		}
+		return nil
+	})
+	sort.Strings(out)
+	return out, err
+}
+
+// heldBack says whether a file sits in a folder whose name starts with an
+// underscore. Everything under such a folder is a draft, whatever its front
+// matter says: the folder is the writer saying "not yet".
+func (s *Store) heldBack(path string) bool {
+	rel, err := filepath.Rel(s.root(), path)
+	if err != nil {
+		return false
+	}
+	for _, part := range strings.Split(filepath.Dir(rel), string(filepath.Separator)) {
+		if strings.HasPrefix(part, "_") {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Store) fingerprint() string {
-	entries, err := os.ReadDir(s.dir)
+	paths, err := s.markdown()
 	if err != nil {
 		return "missing"
 	}
 	var b strings.Builder
-	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".md") {
-			continue
-		}
-		fi, err := e.Info()
+	for _, path := range paths {
+		fi, err := os.Stat(path)
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&b, "%s:%d:%d;", e.Name(), fi.Size(), fi.ModTime().UnixNano())
+		fmt.Fprintf(&b, "%s:%d:%d;", path, fi.Size(), fi.ModTime().UnixNano())
 	}
 	return b.String()
 }
@@ -59,19 +113,25 @@ func (s *Store) Refresh() error {
 		return nil
 	}
 
-	entries, err := os.ReadDir(s.dir)
+	paths, err := s.markdown()
 	if err != nil {
 		return err
 	}
 	var posts, incomplete []*Post
 	bySlug := map[string]*Post{}
-	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".md") {
-			continue
-		}
-		p, err := ParsePost(filepath.Join(s.dir, e.Name()))
+	for _, path := range paths {
+		p, err := ParsePost(path)
 		if err != nil {
 			return err
+		}
+		if s.heldBack(path) {
+			p.Draft = true
+		}
+		if first, taken := bySlug[p.Slug]; taken {
+			// two files of the same name in different folders would answer at
+			// one URL; the first one keeps it, and the other is named here
+			log.Printf("two files want /post/%s: %s and %s", p.Slug, first.File, p.File)
+			continue
 		}
 		if p.Published {
 			posts = append(posts, p)

@@ -4,11 +4,16 @@
 #
 #   scripts/new-draft.sh                  # asks for the title
 #   scripts/new-draft.sh "Why rivers meander"
+#   INTO=_drafts scripts/new-draft.sh "…"  # into another folder
 #
 # POSTS=other/folder scripts/new-draft.sh "…"   writes somewhere else.
 set -euo pipefail
 
 POSTS="${POSTS:-posts}"
+# the folder inside POSTS that a new draft is written to. A folder whose name
+# starts with _ holds its files back whatever their front matter says, so this
+# one is an ordinary folder and the draft flag below does the holding.
+INTO="${INTO:-posts}"
 
 title="${*:-}"
 if [ -z "$title" ]; then
@@ -32,8 +37,9 @@ if [ -z "$slug" ]; then
   exit 1
 fi
 
-mkdir -p "$POSTS"
-file="$POSTS/$slug.md"
+dir="$POSTS/$INTO"
+mkdir -p "$dir"
+file="$dir/$slug.md"
 if [ -e "$file" ]; then
   echo "new-draft: $file is already here; nothing was changed" >&2
   exit 1
@@ -44,6 +50,9 @@ cat > "$file" <<EOF
 date: $(date +%F)
 tag:
 draft: true
+pinned: false
+color:
+depth:
 ---
 
 # $title

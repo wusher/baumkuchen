@@ -36,6 +36,24 @@ A key that is not a setting stops the run and names itself, because a typo
 that is swallowed is a setting that quietly does nothing. The Makefile reads
 the folders out of the same file, so there is one place to change them.
 
+## Where the posts live
+
+Every folder under `posts/` is read, however deep. The folders are for you, not
+for the site: the file name is still the URL, so `posts/2026/why-rivers.md`
+answers at `/post/why-rivers`.
+
+Two folders are stepped over: `images/`, which holds the pictures, and anything
+whose name starts with a dot.
+
+**A folder whose name starts with `_` holds its files back.** Everything under
+`_drafts/` is a draft, whatever its own front matter says — the folder is you
+saying "not yet". Such a file is on the index and readable while the server
+runs, marked as a draft, and never in the built site.
+
+Two files with the same name in different folders would answer at one URL. The
+first one in the walk keeps it, and the startup log names both, so the clash is
+never silent.
+
 ## The publishing rule
 
 A file in `posts/` becomes a post when it holds **one or more** of the five
@@ -315,8 +333,21 @@ clipping holds one depth, not five.
 
 `new-draft.sh` asks for the title, or takes it as an argument. It builds the
 file name from the title (lower case, hyphens), refuses to write over a file
-that is already there, and writes the front matter with `draft: true` and the
-five depth headings. It prints the path it wrote.
+that is already there, and prints the path it wrote. The file lands in
+`posts/posts/` and carries every setting a post can take, so nothing has to be
+remembered:
+
+    ---
+    date: 2026-08-20
+    tag:
+    draft: true
+    pinned: false
+    color:
+    depth:
+    ---
+
+An empty setting does nothing, so a file can be left as it is written. Give
+`INTO` to write somewhere else: `INTO=_drafts scripts/new-draft.sh "…"`.
 
 `audit.sh` reads every file in `posts/` and reports:
 

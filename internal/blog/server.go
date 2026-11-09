@@ -9,18 +9,24 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"baumkuchen/internal/content"
 )
 
 // Config is what a site needs to run. The two file systems are handed in by
 // the command, because //go:embed reads paths from the folder of the package
 // that asks for them, and templates/ and static/ live at the top of the tree.
 type Config struct {
-	Posts     string // the folder with the markdown
-	Templates fs.FS  // holds templates/*.html
-	Static    fs.FS  // holds static/*
+	// Content is where the markdown and the pictures come from: a folder on
+	// disk, or files carried inside the program. When it is not given, the
+	// folder at Posts is read.
+	Content content.Source
+	// Posts is the folder with the markdown, when Content is not given.
+	Posts     string
+	Templates fs.FS // holds templates/*.html
+	Static    fs.FS // holds static/*
 	// Base is the folder the built site is published in, if it is not the
 	// root: "/baumkuchen" for a GitHub project page. The running server
 	// always answers at the root and ignores this.
@@ -33,18 +39,28 @@ type Config struct {
 type Site struct {
 	store  *Store
 	pages  map[string]*template.Template
-	posts  string
+	src    content.Source
+	media  fs.FS
 	static fs.FS
 	base   string
 	title  string
 }
 
-// New reads the posts folder and builds the pages.
+// New reads the posts and builds the pages.
 func New(cfg Config) (*Site, error) {
+	src := cfg.Content
+	if src == nil {
+		src = content.NewDir(cfg.Posts)
+	}
+	media, err := src.Media()
+	if err != nil {
+		return nil, fmt.Errorf("read the pictures: %w", err)
+	}
 	s := &Site{
-		store:  NewStore(cfg.Posts),
+		store:  NewStoreFrom(src),
 		pages:  buildPages(cfg.Templates),
-		posts:  cfg.Posts,
+		src:    src,
+		media:  media,
 		static: cfg.Static,
 		base:   cleanBase(cfg.Base),
 		title:  cfg.Title,
@@ -94,12 +110,12 @@ func buildPages(files fs.FS) map[string]*template.Template {
 }
 
 // routes gives the handler for the whole site. The pictures are served from
-// disk, beside the posts, so a writer can add one without a build.
+// the content, so a writer can add one without a build.
 func (s *Site) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServer(http.FS(s.static)))
 	mux.Handle("/media/", http.StripPrefix("/media/",
-		http.FileServer(http.Dir(filepath.Join(s.posts, "images")))))
+		http.FileServer(http.FS(s.media))))
 	mux.HandleFunc("/post/", s.handlePost)
 	mux.HandleFunc("/", s.handleIndex)
 	return mux

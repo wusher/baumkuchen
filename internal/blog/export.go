@@ -2,6 +2,7 @@ package blog
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -85,10 +86,9 @@ func (s *Site) Export(dir string) (int, error) {
 	}
 
 	// the pictures, which live beside the posts and are served at /media/
-	images := filepath.Join(s.posts, "images")
-	entries, err := os.ReadDir(images)
+	entries, err := fs.ReadDir(s.media, ".")
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return n, nil // a site with no picture is not an error
 		}
 		return n, err
@@ -99,8 +99,11 @@ func (s *Site) Export(dir string) (int, error) {
 		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		src, dst, err := optimizeImage(filepath.Join(images, e.Name()),
-			filepath.Join(dir, "media", e.Name()))
+		data, err := fs.ReadFile(s.media, e.Name())
+		if err != nil {
+			return n, err
+		}
+		src, dst, err := optimizeImageBytes(data, filepath.Join(dir, "media", e.Name()))
 		if err != nil {
 			return n, err
 		}

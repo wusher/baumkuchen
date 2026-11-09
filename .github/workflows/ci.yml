@@ -1,0 +1,41 @@
+# Check the program: the format, the vet, the tests, and the finished binary
+# standing on its own.
+#
+# The posts live outside this repository, behind a link that only exists on
+# the machine that writes them, so the test that reads them skips here.
+# Everything else runs on posts made for the test.
+name: ci
+
+on:
+  push:
+    branches: [master, 'willhq/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: The format and the vet
+        run: make check
+
+      - name: The tests
+        run: make test
+
+      - name: The finished program
+        run: make release
+
+      # the program is copied out of the repository and run there, with the
+      # folder it was built in nowhere near it
+      - name: The program stands on its own
+        run: scripts/smoke.sh build/baumkuchen

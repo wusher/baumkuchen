@@ -4,6 +4,9 @@
 # the compiled server: make build writes it
 baumkuchen
 
+# the finished programs: make release and make bundle write them
+build/
+
 # the usual noise
 *.test
 *.out

@@ -6,7 +6,20 @@ CONFIG ?= baumkuchen.yml
 DIST   ?= $(shell awk '$$1=="dist:" {print $$2}' $(CONFIG))
 POSTS  ?= $(shell awk '$$1=="posts:" {print $$2}' $(CONFIG))
 
-.PHONY: help setup link build run lint check test cover clean new audit export stats
+# where the finished programs are written, and where the posts come from when
+# one is put inside a program
+BUILD   ?= build
+CONTENT ?=
+
+# the name the program gives for itself: the last tag, or the commit
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null || echo none)
+# the day the program was made. SOURCE_DATE_EPOCH makes the build the same
+# every time, so the same source gives the same file twice.
+DATE    ?= $(shell date -u -d "@$${SOURCE_DATE_EPOCH:-$$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+
+.PHONY: help setup link build release releases bundle run lint check test cover clean new audit export stats smoke
 
 help: ## Show the targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*## /|/' | awk -F'|' '{printf "  %-7s %s\n", $$1, $$2}'
@@ -18,6 +31,29 @@ setup: ## Link the posts folder, then download and verify the Go modules
 
 build: ## Compile the server into ./$(BINARY)
 	go build -trimpath -o $(BINARY) .
+
+release: ## The finished program, with its name in it, into ./$(BUILD)
+	@mkdir -p $(BUILD)
+	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
+	@$(BUILD)/$(BINARY) -version
+
+releases: ## The finished program for every system it runs on
+	@mkdir -p $(BUILD)
+	@for os in linux darwin windows; do \
+		for arch in amd64 arm64; do \
+			ext=""; [ "$$os" = "windows" ] && ext=".exe"; \
+			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath \
+				-ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY)-$(VERSION)-$$os-$$arch$$ext . || exit 1; \
+		done; \
+	done
+	@ls -l $(BUILD)
+
+bundle: ## One file with the program and the posts inside it (CONTENT=folder)
+	@test -n "$(CONTENT)" || { echo "bundle: name the folder with the posts: make bundle CONTENT=~/blog"; exit 1; }
+	@mkdir -p $(BUILD)
+	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
+	$(BUILD)/$(BINARY) -bundle $(CONTENT) -o $(BUILD)/$(BINARY)-bundle
+	@echo "$(BUILD)/$(BINARY)-bundle holds the program and the posts from $(CONTENT)"
 
 run: ## Start the server, on the address in $(CONFIG)
 	go run .
@@ -63,5 +99,9 @@ audit: ## What is written, and what is wrong with it
 stats: ## The same table, with the numbers only
 	@POSTS=$(POSTS) scripts/audit.sh --table
 
-clean: ## Remove the compiled binary
+smoke: ## Prove the finished program stands on its own, with the source away
+	scripts/smoke.sh
+
+clean: ## Remove the compiled programs
 	rm -f $(BINARY)
+	rm -rf $(BUILD)

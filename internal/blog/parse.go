@@ -6,12 +6,13 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"baumkuchen/internal/content"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
@@ -259,19 +260,31 @@ func truthy(v string) bool {
 	return false
 }
 
-// ParsePost reads one markdown file and cuts it into depth levels.
+// ParsePost reads one markdown file from disk.
+func ParsePost(file string) (*Post, error) {
+	dir, name := filepath.Split(file)
+	p, err := parsePost(content.NewDir(dir), name)
+	if err != nil {
+		return nil, err
+	}
+	p.File = file
+	return p, nil
+}
 
-func ParsePost(path string) (*Post, error) {
-	raw, err := os.ReadFile(path)
+// parsePost reads one markdown file from a source and cuts it into depth
+// levels. The path is the one the source gave, so a file on disk and a file
+// inside the program are read the same way.
+func parsePost(src content.Source, file string) (*Post, error) {
+	raw, err := src.Read(file)
 	if err != nil {
 		return nil, err
 	}
 	meta, body := splitFrontMatter(string(raw))
 
 	p := &Post{
-		Slug:   strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)),
+		Slug:   strings.TrimSuffix(path.Base(file), path.Ext(file)),
 		Tag:    meta["tag"],
-		File:   path,
+		File:   file,
 		Draft:  truthy(meta["draft"]),
 		Pinned: truthy(meta["pinned"]),
 		Color:  colorName(meta["color"]),
@@ -283,7 +296,7 @@ func ParsePost(path string) (*Post, error) {
 		}
 	}
 	if p.Date.IsZero() {
-		if fi, err := os.Stat(path); err == nil {
+		if fi, err := src.Stat(file); err == nil {
 			p.Date = fi.ModTime()
 		}
 	}
@@ -331,7 +344,7 @@ func ParsePost(path string) (*Post, error) {
 		}
 		var buf bytes.Buffer
 		if err := md.Convert([]byte(expandBlocks(text)), &buf); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+			return nil, fmt.Errorf("%s: %w", file, err)
 		}
 		words := proseWords(text)
 		p.Levels = append(p.Levels, Level{

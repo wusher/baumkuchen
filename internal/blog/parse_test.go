@@ -177,11 +177,19 @@ func TestNormalizeHead(t *testing.T) {
 
 // House style, on the real posts: a Sentence depth stays at or under 35 words,
 // and at most one paragraph in four may run to 120 words or more.
+//
+// The real posts live outside this repository, behind a link that only exists
+// on the machine that writes them. Where they are not there the test skips,
+// and the fixtures in the other tests stand in for them.
 func TestRealPostsKeepHouseStyle(t *testing.T) {
 	// arrange: the real posts, which sit two folders up
-	paths, err := filepath.Glob(filepath.Join("..", "..", "posts", "*.md"))
+	dir := os.Getenv("BAUMKUCHEN_POSTS")
+	if dir == "" {
+		dir = filepath.Join("..", "..", "posts")
+	}
+	paths, err := filepath.Glob(filepath.Join(dir, "*.md"))
 	if err != nil || len(paths) == 0 {
-		t.Fatalf("no posts found: %v", err)
+		t.Skipf("no real posts at %s: set BAUMKUCHEN_POSTS to run this one", dir)
 	}
 
 	for _, path := range paths {

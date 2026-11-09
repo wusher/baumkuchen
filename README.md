@@ -14,6 +14,76 @@ has. New words fill the page as the text grows, and drain away as it shrinks.
     make export    # build the static site into ./dist
     make lint      # repair the format, then vet
     make build     # a single binary, templates and assets included
+    make release   # the finished program, with its name in it
+    make smoke     # prove the finished program stands on its own
+
+## The program on its own
+
+The program is one file. The templates, the stylesheet, the script and the
+settings are built into it, so a copy of it runs anywhere: it needs the folder
+it was made in for nothing at all.
+
+    make release                     # ./build/baumkuchen
+    ./build/baumkuchen -version
+
+The **posts** are not built in. They are the writing, and they stay where the
+writer keeps them. The program is told where they are:
+
+    ./build/baumkuchen -posts ~/blog                  # this folder
+    BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen         # the same, from the environment
+    ./build/baumkuchen -posts ~/blog -config my.yml    # with other settings
+
+The first one that is there wins: the flag, then the environment, then the
+`posts:` line in the settings file. A folder that is not there is reported by
+name, rather than quietly giving an empty site.
+
+There are two ways to run it.
+
+**The static site.** The build writes the whole site as plain files and stops.
+
+    ./build/baumkuchen -posts ~/blog -export out
+
+**The live site.** The server answers on an address and rereads the posts when
+a file changes, so you can edit a post and refresh the page.
+
+    ./build/baumkuchen -posts ~/blog -addr 127.0.0.1:8080
+
+Both work the same whether the posts are in a folder or inside the program.
+
+### One file with the posts inside
+
+A copy of the program with the posts in it is made on purpose, by naming the
+folder to put in. Nothing is ever put inside a program by accident.
+
+    make bundle CONTENT=~/blog          # ./build/baumkuchen-bundle
+    ./build/baumkuchen-bundle -export out
+
+That one file builds the site and serves it, with nothing else on the machine:
+the posts, the templates, the stylesheet and the settings are all in it.
+
+### The build
+
+    make build        # ./baumkuchen, for the work in progress
+    make release      # ./build/baumkuchen, with the version in it
+    make releases     # the same, for linux, darwin and windows, on both chips
+    make smoke        # prove the program stands on its own
+
+`make release` writes the name of the build into the program, so a copy can
+say which one it is:
+
+    ./build/baumkuchen -version
+    baumkuchen v1.2.3 (a1b2c3d, 2026-09-01T10:00:00Z)
+
+The build is the same every time, given the same source and the same tool
+chain. `SOURCE_DATE_EPOCH` fixes the day, so two builds on two days give the
+same file:
+
+    SOURCE_DATE_EPOCH=1759312800 make release
+
+`make smoke` is the check that matters: it copies the finished program out of
+the repository, writes some posts for the test, builds the site, serves it,
+changes a post and sees the change, and does the same with a copy that has the
+posts inside. The tests in the repository do the same in Go.
 
 ## The settings
 
@@ -41,6 +111,11 @@ the folders out of the same file, so there is one place to change them.
 Every folder under `posts/` is read, however deep. The folders are for you, not
 for the site: the file name is still the URL, so `posts/2026/why-rivers.md`
 answers at `/post/why-rivers`.
+
+The folder is wherever the writing is. In this repository it is a link to the
+folder outside, and the link is followed once, when the folder is opened, so
+every path inside is a real one. A program that was copied somewhere else
+reads the same posts from the folder you name with `-posts`.
 
 Two folders are stepped over: `images/`, which holds the pictures, and anything
 whose name starts with a dot.
@@ -240,7 +315,7 @@ A name that is not on the list is dropped: the page keeps the site's accent,
 and `make audit` reports the line. To change a value, or to add a name, the
 whole palette is the block under `the named colours` in `static/style.css`.
 
-## The build
+## The build of the site
 
     make export             # into ./dist
     make export DIST=out    # somewhere else
@@ -257,6 +332,10 @@ deploy:
 A draft never reaches it, and neither does a file with no depth. `make export`
 empties the folder first, so a post you renamed leaves no page behind; the Go
 code itself deletes nothing, and the `rm` sits on the line that does it.
+
+The finished program does the same build, without the repository:
+
+    ./build/baumkuchen -posts ~/blog -export out
 
 ### The folder the site is published in
 
@@ -377,10 +456,24 @@ Two switches change that:
 
 ## Files
 
-    main.go     the server, the routes, the templates
-    post.go     the markdown split into depths, and the publishing rule
-    post_test.go  the tests for that rule
+    main.go     the command: the flags, the settings, the two ways to run
+    internal/blog/  the site: the posts, the pages, the build, the server
+    internal/content/  where the posts come from: a folder, or files in the program
+    internal/bundle/   putting the posts inside a copy of the program
     templates/  layout, index, post, 404
     static/     one stylesheet, one script
-    posts/      the example posts
+    posts/      the posts, which live outside this repository
     posts/images/  pictures, served at /media/
+
+The tests run on posts made for them. The one test that reads the real posts
+skips when they are not there, and runs when `BAUMKUCHEN_POSTS` names them.
+
+## The checks
+
+    make check   # the format and the vet; changes no file
+    make test    # the tests
+    make lint    # repair the format, then report what is left
+    make smoke   # the finished program, out of the repository, doing its work
+
+The same checks run on every push, in `.github/workflows/ci.yml`.
+

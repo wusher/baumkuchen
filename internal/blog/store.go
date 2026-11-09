@@ -1,20 +1,23 @@
-// Reading the posts folder, and holding what was read: the index, the drafts,
+// Reading the posts, and holding what was read: the index, the drafts,
 // and the files that carry no depth at all.
+//
+// The posts come from a content.Source, so the same store serves a folder on
+// disk and a set of files carried inside the program.
 package blog
 
 import (
 	"fmt"
-	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 	"sync"
+
+	"baumkuchen/internal/content"
 )
 
 type Store struct {
-	dir string
+	src content.Source
 
 	mu sync.RWMutex
 	// posts holds every file that carries a depth, drafts among them, in the
@@ -27,58 +30,31 @@ type Store struct {
 	stamp      string
 }
 
+// NewStore reads the posts in the folder at dir.
 func NewStore(dir string) *Store {
-	return &Store{dir: dir, bySlug: map[string]*Post{}}
+	return NewStoreFrom(content.NewDir(dir))
 }
 
-// root gives the folder to read, with any symlink resolved. The posts often
-// live outside the repository, with ./posts pointing at them, and a walk does
-// not follow a link at its starting point.
-func (s *Store) root() string {
-	if resolved, err := filepath.EvalSymlinks(s.dir); err == nil {
-		return resolved
-	}
-	return s.dir
+// NewStoreFrom reads the posts a source holds.
+func NewStoreFrom(src content.Source) *Store {
+	return &Store{src: src, bySlug: map[string]*Post{}}
 }
 
-// markdown gives every .md file under the root, in order, with the path each
-// one was found at. The pictures folder is stepped over, and so is anything
-// hidden: a folder a person cannot see is not one they meant to publish from.
+// markdown gives every .md file the source holds, in order, with the path
+// each one was found at.
 func (s *Store) markdown() ([]string, error) {
-	var out []string
-	root := s.root()
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := d.Name()
-		if d.IsDir() {
-			if path == root {
-				return nil
-			}
-			if name == "images" || strings.HasPrefix(name, ".") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if strings.EqualFold(filepath.Ext(name), ".md") {
-			out = append(out, path)
-		}
-		return nil
-	})
-	sort.Strings(out)
-	return out, err
+	return s.src.List()
 }
 
 // heldBack says whether a file sits in a folder whose name starts with an
 // underscore. Everything under such a folder is a draft, whatever its front
 // matter says: the folder is the writer saying "not yet".
-func (s *Store) heldBack(path string) bool {
-	rel, err := filepath.Rel(s.root(), path)
-	if err != nil {
+func (s *Store) heldBack(file string) bool {
+	dir := path.Dir(file)
+	if dir == "." || dir == "/" {
 		return false
 	}
-	for _, part := range strings.Split(filepath.Dir(rel), string(filepath.Separator)) {
+	for _, part := range strings.Split(dir, "/") {
 		if strings.HasPrefix(part, "_") {
 			return true
 		}
@@ -92,12 +68,12 @@ func (s *Store) fingerprint() string {
 		return "missing"
 	}
 	var b strings.Builder
-	for _, path := range paths {
-		fi, err := os.Stat(path)
+	for _, file := range paths {
+		fi, err := s.src.Stat(file)
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&b, "%s:%d:%d;", path, fi.Size(), fi.ModTime().UnixNano())
+		fmt.Fprintf(&b, "%s:%d:%d;", file, fi.Size(), fi.ModTime().UnixNano())
 	}
 	return b.String()
 }
@@ -119,12 +95,12 @@ func (s *Store) Refresh() error {
 	}
 	var posts, incomplete []*Post
 	bySlug := map[string]*Post{}
-	for _, path := range paths {
-		p, err := ParsePost(path)
+	for _, file := range paths {
+		p, err := parsePost(s.src, file)
 		if err != nil {
 			return err
 		}
-		if s.heldBack(path) {
+		if s.heldBack(file) {
 			p.Draft = true
 		}
 		if first, taken := bySlug[p.Slug]; taken {

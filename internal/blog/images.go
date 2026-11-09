@@ -31,15 +31,32 @@ const (
 // does not encode, and a picture whose new form is no smaller are all copied
 // byte for byte. Only the build folder is written; the source is never touched.
 func optimizeImage(from, to string) (int64, int64, error) {
-	info, err := os.Stat(from)
+	data, err := os.ReadFile(from)
 	if err != nil {
 		return 0, 0, fmt.Errorf("read %s: %w", filepath.Base(from), err)
 	}
-	src := info.Size()
+	src, dst, err := optimizeImageBytes(data, to)
+	if err != nil {
+		return 0, 0, err
+	}
+	return src, dst, nil
+}
 
-	small, err := shrink(from)
+// optimizeImageBytes writes the bytes of a picture at to, made smaller where
+// it can be, and gives the size of what it was given and the size of what it
+// wrote.
+//
+// It never makes a picture worse. One it cannot read, a format it does not
+// encode, and a picture whose new form is no smaller are all written as they
+// came.
+func optimizeImageBytes(data []byte, to string) (int64, int64, error) {
+	src := int64(len(data))
+	small, err := shrinkBytes(data)
 	if err != nil || int64(len(small)) >= src {
-		if err := copyFile(from, to); err != nil {
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			return src, 0, err
+		}
+		if err := os.WriteFile(to, data, 0o644); err != nil {
 			return src, 0, err
 		}
 		return src, src, nil
@@ -53,17 +70,10 @@ func optimizeImage(from, to string) (int64, int64, error) {
 	return src, int64(len(small)), nil
 }
 
-// shrink reads a picture, scales it down to the limit, and encodes it again in
-// the format it came in. The re-encoding also drops the camera and editor notes
-// the file carries, which no reader ever sees.
-func shrink(path string) ([]byte, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	img, format, err := image.Decode(f)
+// shrinkBytes reads a picture from its bytes, scales it down to the limit, and
+// encodes it again in the format it came in.
+func shrinkBytes(data []byte) ([]byte, error) {
+	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +87,7 @@ func shrink(path string) ([]byte, error) {
 		enc := png.Encoder{CompressionLevel: png.BestCompression}
 		err = enc.Encode(&out, img)
 	default:
-		return nil, fmt.Errorf("%s is a format the build leaves alone", format)
+		return nil, fmt.Errorf("a picture in %s is a format the build leaves alone", format)
 	}
 	if err != nil {
 		return nil, err

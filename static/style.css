@@ -141,7 +141,10 @@ header.site, footer.site {
   max-width: var(--measure); margin: 0 auto; padding: 2.2rem 1.4rem 2.6rem;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
 }
-footer.site { padding-top: 2rem; padding-bottom: 3rem; border-top: 1px solid var(--rule); }
+footer.site {
+  padding-top: 2rem; padding-bottom: 3rem; border-top: 1px solid var(--rule);
+  justify-content: center;
+}
 
 /* Above the phone width the wordmark and the theme button leave the flow and
    take the two top corners of the page. The header keeps no height of its own,

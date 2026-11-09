@@ -23,6 +23,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -95,9 +96,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	dest := export(*out, cfg.Dist)
+	templateFiles, staticFiles := fs.FS(templates), fs.FS(static)
+	liveReload := false
+	if dest == "" {
+		if _, templateErr := os.Stat("templates/layout.html"); templateErr == nil {
+			if _, staticErr := os.Stat("static/style.css"); staticErr == nil {
+				templateFiles, staticFiles = os.DirFS("."), os.DirFS(".")
+				liveReload = true
+			}
+		}
+	}
 	site, err := blog.New(blog.Config{
-		Content: src, Templates: templates, Static: static,
-		Base: cfg.Base, Title: cfg.Title,
+		Content: src, Templates: templateFiles, Static: staticFiles,
+		Base: cfg.Base, Title: cfg.Title, LiveReload: liveReload,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -112,7 +124,7 @@ func main() {
 		published, drafts, incomplete)
 
 	// the build: write the files and stop, with no draft among them
-	if dest := export(*out, cfg.Dist); dest != "" {
+	if dest != "" {
 		n, err := site.Export(dest)
 		if err != nil {
 			log.Fatalf("export: %v", err)
@@ -121,6 +133,9 @@ func main() {
 		return
 	}
 
+	if liveReload {
+		log.Printf("live reload watching templates/*.html and static/*.css")
+	}
 	log.Printf("the blog is on http://%s", host(cfg.Addr))
 	if err := site.Serve(cfg.Addr); err != nil {
 		log.Fatal(err)

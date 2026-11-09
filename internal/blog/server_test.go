@@ -1,10 +1,12 @@
 package blog
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -89,6 +91,94 @@ func TestReloadFindsANewPost(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Later") {
 		t.Error("a post written after the start did not appear")
 	}
+}
+
+// The development server reads templates from disk after it starts, injects
+// the browser watcher, and changes the versions that watcher polls.
+func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
+	// arrange
+	root := t.TempDir()
+	for _, dir := range []string{"templates", "static"} {
+		if err := os.Mkdir(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"layout.html", "index.html", "post.html", "404.html"} {
+		body, err := os.ReadFile(filepath.Join("..", "..", "templates", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(t, filepath.Join(root, "templates"), name, string(body))
+	}
+	write(t, filepath.Join(root, "static"), "style.css", "body { color: red; }")
+	posts := t.TempDir()
+	postFile(t, posts, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	files := os.DirFS(root)
+	site, err := New(Config{
+		Posts: posts, Templates: files, Static: files, LiveReload: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// act
+	beforePage := servedIndex(site)
+	beforeVersion := reloadVersions(t, site)
+	indexPath := filepath.Join(root, "templates", "index.html")
+	index, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Dir(indexPath), filepath.Base(indexPath),
+		strings.Replace(string(index), `<p class="eyebrow posts">posts</p>`,
+			`<p class="eyebrow posts">fresh template</p>`, 1))
+	write(t, filepath.Join(root, "static"), "style.css", "body { color: blue; }")
+	afterPage := servedIndex(site)
+	afterVersion := reloadVersions(t, site)
+	css := httptest.NewRecorder()
+	site.routes().ServeHTTP(css,
+		httptest.NewRequest(http.MethodGet, "/static/style.css?_reload=1", nil))
+	var exported strings.Builder
+	if err := site.renderTo(&exported, "index.html", pageData{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// assert
+	if !strings.Contains(beforePage, "/__baumkuchen_reload") {
+		t.Error("the served page does not carry the live reload watcher")
+	}
+	if !strings.Contains(afterPage, "fresh template") {
+		t.Error("a template edit did not reach the next request")
+	}
+	if strings.Contains(exported.String(), "/__baumkuchen_reload") {
+		t.Error("the live reload watcher reached the shared export renderer")
+	}
+	if beforeVersion["templates"] == afterVersion["templates"] {
+		t.Error("the template version did not change")
+	}
+	if beforeVersion["css"] == afterVersion["css"] {
+		t.Error("the CSS version did not change")
+	}
+	if !strings.Contains(css.Body.String(), "color: blue") {
+		t.Error("the changed stylesheet was not served from disk")
+	}
+}
+
+func servedIndex(site *Site) string {
+	rec := httptest.NewRecorder()
+	site.handleIndex(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	return rec.Body.String()
+}
+
+func reloadVersions(t *testing.T, site *Site) map[string]string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	site.handleLiveReload(rec, httptest.NewRequest(http.MethodGet, "/__baumkuchen_reload", nil))
+	var versions map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&versions); err != nil {
+		t.Fatal(err)
+	}
+	return versions
 }
 
 // What the command prints when it starts.

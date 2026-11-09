@@ -3,6 +3,10 @@
 package blog
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -10,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"baumkuchen/internal/content"
@@ -33,17 +38,26 @@ type Config struct {
 	Base string
 	// Title is the name of the site.
 	Title string
+	// LiveReload rereads templates and tells an open browser when templates or
+	// stylesheets change. It is intended for the disk-backed development server.
+	LiveReload bool
 }
 
 // Site is one blog: the posts it has read, and the pages it can write.
 type Site struct {
-	store  *Store
-	pages  map[string]*template.Template
-	src    content.Source
-	media  fs.FS
-	static fs.FS
-	base   string
-	title  string
+	store      *Store
+	pages      map[string]*template.Template
+	src        content.Source
+	media      fs.FS
+	templates  fs.FS
+	static     fs.FS
+	base       string
+	title      string
+	liveReload bool
+
+	templatesMu     sync.RWMutex
+	templateVersion string
+	templateSeen    string
 }
 
 // New reads the posts and builds the pages.
@@ -56,16 +70,28 @@ func New(cfg Config) (*Site, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the pictures: %w", err)
 	}
-	s := &Site{
-		store:  NewStoreFrom(src),
-		pages:  buildPages(cfg.Templates),
-		src:    src,
-		media:  media,
-		static: cfg.Static,
-		base:   cleanBase(cfg.Base),
-		title:  cfg.Title,
+	pages, err := buildPages(cfg.Templates)
+	if err != nil {
+		return nil, fmt.Errorf("read templates: %w", err)
 	}
-	if err := s.store.Refresh(); err != nil {
+	templateVersion, err := filesVersion(cfg.Templates, "templates/*.html")
+	if err != nil {
+		return nil, fmt.Errorf("read templates: %w", err)
+	}
+	s := &Site{
+		store:           NewStoreFrom(src),
+		pages:           pages,
+		src:             src,
+		media:           media,
+		templates:       cfg.Templates,
+		static:          cfg.Static,
+		base:            cleanBase(cfg.Base),
+		title:           cfg.Title,
+		liveReload:      cfg.LiveReload,
+		templateVersion: templateVersion,
+		templateSeen:    templateVersion,
+	}
+	if err = s.store.Refresh(); err != nil {
 		return nil, fmt.Errorf("read posts: %w", err)
 	}
 	return s, nil
@@ -95,18 +121,21 @@ type pageData struct {
 
 // buildPages joins each page to the layout in its own template set,
 // because every page file gives its content the same name.
-func buildPages(files fs.FS) map[string]*template.Template {
+func buildPages(files fs.FS) (map[string]*template.Template, error) {
 	funcs := template.FuncMap{
 		"join": strings.Join,
 		"dec":  func(n int) int { return n - 1 },
 	}
 	pages := map[string]*template.Template{}
 	for _, name := range []string{"index.html", "post.html", "404.html"} {
-		t := template.Must(template.New(name).Funcs(funcs).
-			ParseFS(files, "templates/layout.html", "templates/"+name))
+		t, err := template.New(name).Funcs(funcs).
+			ParseFS(files, "templates/layout.html", "templates/"+name)
+		if err != nil {
+			return nil, err
+		}
 		pages[name] = t
 	}
-	return pages
+	return pages, nil
 }
 
 // routes gives the handler for the whole site. The pictures are served from
@@ -116,6 +145,9 @@ func (s *Site) routes() http.Handler {
 	mux.Handle("/static/", http.FileServer(http.FS(s.static)))
 	mux.Handle("/media/", http.StripPrefix("/media/",
 		http.FileServer(http.FS(s.media))))
+	if s.liveReload {
+		mux.HandleFunc("/__baumkuchen_reload", s.handleLiveReload)
+	}
 	mux.HandleFunc("/post/", s.handlePost)
 	mux.HandleFunc("/", s.handleIndex)
 	return mux
@@ -138,12 +170,60 @@ func (s *Site) reload() {
 	}
 }
 
+// reloadTemplates replaces the cached templates only after every page parses.
+// A half-written template therefore leaves the last good page in place and is
+// tried again after the file changes once more.
+func (s *Site) reloadTemplates() {
+	if !s.liveReload {
+		return
+	}
+	version, err := filesVersion(s.templates, "templates/*.html")
+	if err != nil {
+		log.Printf("reload templates: %v", err)
+		return
+	}
+
+	s.templatesMu.Lock()
+	defer s.templatesMu.Unlock()
+	if version == s.templateSeen {
+		return
+	}
+	s.templateSeen = version
+	pages, err := buildPages(s.templates)
+	if err != nil {
+		log.Printf("reload templates: %v", err)
+		return
+	}
+	s.pages = pages
+	s.templateVersion = version
+}
+
+func filesVersion(files fs.FS, pattern string) (string, error) {
+	names, err := fs.Glob(files, pattern)
+	if err != nil {
+		return "", err
+	}
+	h := sha256.New()
+	for _, name := range names {
+		body, err := fs.ReadFile(files, name)
+		if err != nil {
+			return "", err
+		}
+		_, _ = io.WriteString(h, name)
+		_, _ = h.Write(body)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 // renderTo writes one page anywhere. The server and the build both use it, so
 // a page cannot come out one way on screen and another way in the folder.
 func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	data.Year = time.Now().Year()
 	data.Site = s.title
+	s.reloadTemplates()
+	s.templatesMu.RLock()
 	t, ok := s.pages[name]
+	s.templatesMu.RUnlock()
 	if !ok {
 		return fmt.Errorf("no page named %s", name)
 	}
@@ -152,10 +232,60 @@ func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 
 func (s *Site) render(w http.ResponseWriter, name string, data pageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.renderTo(w, name, data); err != nil {
+	var page bytes.Buffer
+	if err := s.renderTo(&page, name, data); err != nil {
 		log.Printf("render %s: %v", name, err)
+		return
 	}
+	body := page.Bytes()
+	if s.liveReload {
+		body = bytes.Replace(body, []byte("</body>"), []byte(liveReloadScript+"</body>"), 1)
+	}
+	_, _ = w.Write(body)
 }
+
+func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {
+	s.reloadTemplates()
+	cssVersion, err := filesVersion(s.static, "static/*.css")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.templatesMu.RLock()
+	templateVersion := s.templateVersion
+	s.templatesMu.RUnlock()
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"css": cssVersion, "templates": templateVersion,
+	})
+}
+
+const liveReloadScript = `<script>
+(() => {
+  let previous;
+  async function check() {
+    try {
+      const response = await fetch('/__baumkuchen_reload', {cache: 'no-store'});
+      const next = await response.json();
+      if (previous && next.templates !== previous.templates) {
+        location.reload();
+        return;
+      }
+      if (previous && next.css !== previous.css) {
+        document.querySelectorAll('link[rel="stylesheet"][href^="/static/"]').forEach(link => {
+          const url = new URL(link.href);
+          url.searchParams.set('_reload', Date.now());
+          link.href = url;
+        });
+      }
+      previous = next;
+    } catch (_) {}
+    setTimeout(check, 500);
+  }
+  check();
+})();
+</script>`
 
 func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {

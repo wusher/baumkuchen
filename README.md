@@ -224,7 +224,10 @@ post that does not carry the chosen depth opens at the nearest one it has,
 and leaves the choice alone; only moving the slider sets a new one.
 
 The server rereads `posts/` when a file changes, so you can edit a post and
-refresh the page.
+refresh the page. When it runs from the project folder, it also live reloads
+`templates/*.html` and `static/*.css`: template edits refresh the browser and
+stylesheet edits appear without a page refresh. Static exports still use the
+files embedded in the binary.
 
 `audit.sh` gives one row per file — the words in each of the five depths, the
 total written, and the time to read the longest depth — and under a row,

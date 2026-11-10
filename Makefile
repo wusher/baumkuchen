@@ -11,6 +11,11 @@ POSTS  ?= $(shell awk '$$1=="posts:" {print $$2}' $(CONFIG))
 BUILD   ?= build
 CONTENT ?=
 
+# install for the current user by default; PREFIX and DESTDIR allow a system
+# install or a staged package without changing the build
+PREFIX  ?= $(HOME)/.local
+DESTDIR ?=
+
 # the name the program gives for itself: the last tag, or the commit
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null || echo none)
@@ -19,7 +24,7 @@ COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u -d "@$${SOURCE_DATE_EPOCH:-$$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: help setup link build release releases bundle run lint check test cover clean new audit export stats smoke
+.PHONY: help setup link build release install releases bundle run lint check test cover clean new audit export stats smoke
 
 help: ## Show the targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*## /|/' | awk -F'|' '{printf "  %-7s %s\n", $$1, $$2}'
@@ -36,6 +41,10 @@ release: ## The finished program, with its name in it, into ./$(BUILD)
 	@mkdir -p $(BUILD)
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
 	@$(BUILD)/$(BINARY) -version
+
+install: release ## Install the finished program into $(PREFIX)/bin
+	install -d "$(DESTDIR)$(PREFIX)/bin"
+	install -m 755 "$(BUILD)/$(BINARY)" "$(DESTDIR)$(PREFIX)/bin/$(BINARY)"
 
 releases: ## The finished program for every system it runs on
 	@mkdir -p $(BUILD)

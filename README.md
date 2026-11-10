@@ -15,6 +15,7 @@ has. New words fill the page as the text grows, and drain away as it shrinks.
     make lint      # repair the format, then vet
     make build     # a single binary, templates and assets included
     make release   # the finished program, with its name in it
+    make install   # build and install into ~/.local/bin
     make smoke     # prove the finished program stands on its own
 
 ## The program on its own
@@ -60,6 +61,17 @@ folder to put in. Nothing is ever put inside a program by accident.
 
 That one file builds the site and serves it, with nothing else on the machine:
 the posts, the templates, the stylesheet and the settings are all in it.
+
+### Install
+
+    make install                       # ~/.local/bin/baumkuchen
+    baumkuchen -posts ~/blog
+
+Make sure `~/.local/bin` is on your `PATH`. Only the program is installed;
+posts stay in the folder you choose. Override `PREFIX` for another location,
+or use `DESTDIR` to stage an installation for packaging:
+
+    make install PREFIX=/usr/local DESTDIR=/tmp/package
 
 ### The build
 

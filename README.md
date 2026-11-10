@@ -467,9 +467,17 @@ Two switches change that:
     static/     one stylesheet, one script
     posts/      the posts, which live outside this repository
     posts/images/  pictures, served at /media/
+    test-blog/  a second set of posts, made for the test
 
 The tests run on posts made for them. The one test that reads the real posts
 skips when they are not there, and runs when `BAUMKUCHEN_POSTS` names them.
+
+`test-blog/` holds ten articles about basic science, each written at all five
+depths and each with its own pictures. They are written for the test, and they
+are read like any other folder of posts:
+
+    ./build/baumkuchen -posts test-blog -addr 127.0.0.1:8080
+    POSTS=test-blog IMAGES=test-blog/images scripts/audit.sh
 
 ## The checks
 

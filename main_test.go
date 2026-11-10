@@ -9,6 +9,35 @@ import (
 	"baumkuchen/internal/blog"
 )
 
+func TestPostsArgument(t *testing.T) {
+	cases := []struct {
+		name     string
+		args     []string
+		dir      string
+		explicit bool
+		want     string
+		given    bool
+		wantErr  bool
+	}{
+		{name: "defaults"},
+		{name: "positional", args: []string{"test-blog/"}, want: "test-blog/", given: true},
+		{name: "flag", dir: "test-blog/", explicit: true, want: "test-blog/", given: true},
+		{name: "both", args: []string{"test-blog/"}, dir: "other", explicit: true, wantErr: true},
+		{name: "extra arguments", args: []string{"test-blog/", "other"}, wantErr: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir, given, err := postsArgument(c.args, c.dir, c.explicit)
+			if (err != nil) != c.wantErr {
+				t.Fatalf("error = %v, want error: %v", err, c.wantErr)
+			}
+			if err == nil && (dir != c.want || given != c.given) {
+				t.Errorf("got (%q, %v), want (%q, %v)", dir, given, c.want, c.given)
+			}
+		})
+	}
+}
+
 // The settings file is read when it is there, and the settings inside the
 // program stand when it is not.
 func TestLoadSettings(t *testing.T) {

@@ -30,12 +30,15 @@ it was made in for nothing at all.
 The **posts** are not built in. They are the writing, and they stay where the
 writer keeps them. The program is told where they are:
 
-    ./build/baumkuchen -posts ~/blog                  # this folder
+    ./build/baumkuchen test-blog/                     # this folder (relative or absolute)
+    ./build/baumkuchen -posts ~/blog                  # the explicit flag works too
     BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen         # the same, from the environment
     ./build/baumkuchen -posts ~/blog -config my.yml    # with other settings
 
-The first one that is there wins: the flag, then the environment, then the
-`posts:` line in the settings file. A folder that is not there is reported by
+The first one that is there wins: the positional folder or `-posts` flag, then
+the environment, then the `posts:` line in the settings file. Pass only one
+folder, using either the positional argument or `-posts`, not both. Put flags
+before the positional folder, for example `baumkuchen -addr :9090 test-blog/`. A folder that is not there is reported by
 name, rather than quietly giving an empty site.
 
 There are two ways to run it.

@@ -2,7 +2,7 @@
 // lengths.
 //
 //	baumkuchen                          # serve the posts, live, on the address in the settings
-//	baumkuchen -posts ~/blog           # serve the posts in another folder
+//	baumkuchen ~/blog                  # serve the posts in another folder
 //	baumkuchen -posts ~/blog -export out   # write the static site, then stop
 //
 // The program is one file. The templates, the stylesheet, the script and the
@@ -60,7 +60,17 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the version and stop")
 	pack := flag.String("bundle", "", "write a copy of this program with the content in this folder inside it")
 	to := flag.String("o", "", "where to write that copy")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] [posts-directory]\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
+	postsDir, postsGiven, err := postsArgument(flag.Args(), *dir, given("posts"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		flag.Usage()
+		os.Exit(2)
+	}
 
 	if *showVersion {
 		fmt.Println(versionLine())
@@ -91,7 +101,10 @@ func main() {
 		}
 	})
 
-	src, err := chooseSource(cfg, given("posts"))
+	if postsGiven {
+		cfg.Posts = postsDir
+	}
+	src, err := chooseSource(cfg, postsGiven)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,6 +153,20 @@ func main() {
 	if err := site.Serve(cfg.Addr); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// postsArgument accepts one positional folder as shorthand for -posts.
+func postsArgument(args []string, dir string, explicit bool) (string, bool, error) {
+	if len(args) > 1 {
+		return "", false, errors.New("expected at most one posts directory; put flags before the directory")
+	}
+	if len(args) == 1 {
+		if explicit {
+			return "", false, errors.New("use either -posts or a positional posts directory, not both")
+		}
+		return args[0], true, nil
+	}
+	return dir, explicit, nil
 }
 
 // host gives the address to show in the log: a port on its own means this

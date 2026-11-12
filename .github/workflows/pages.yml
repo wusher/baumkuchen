@@ -1,15 +1,27 @@
-# Publish the built site to GitHub Pages.
+# Publish the test blog to GitHub Pages.
 #
-# The site is built on your own machine, because the posts live outside this
-# repository behind a symlink that only exists there. `make export` writes
-# ./dist and that folder is committed; this workflow only publishes it.
+# The real posts live outside this repository, behind a link that only exists
+# on the machine that writes them, so they cannot be built here. The test
+# blog lives in the repository, so this workflow builds it and publishes the
+# result.
+#
+# The site is a GitHub project page, so it is served from /baumkuchen/. The
+# folder is read out of the settings file, the same place the Makefile reads
+# it from, and the build puts it in front of every link it writes.
 name: pages
 
 on:
   push:
     branches: [master]
     paths:
-      - 'dist/**'
+      - 'test-blog/**'
+      - 'templates/**'
+      - 'static/**'
+      - 'internal/**'
+      - 'main.go'
+      - 'baumkuchen.yml'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -32,17 +44,49 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # a missing or empty dist means someone forgot `make export`; say so
-      # here rather than publishing an empty site
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24'
+          cache: true
+
+      # the folder the posts are read from is named here, because the one in
+      # the settings is a link to a place that is not there on the runner
+      - name: Build the test blog
+        shell: bash
+        run: |
+          base=$(awk '$1=="base:" {print $2}' baumkuchen.yml)
+          echo "building the test blog for ${base:-the root of the site}"
+          go run . -posts test-blog -base "$base" -export public 2>&1 | tee build.log
+
+      # a missing or empty build means the build did not run; say so here
+      # rather than publishing an empty site
       - name: Check the build is there
         run: |
-          test -f dist/index.html || { echo "dist/index.html is missing: run 'make export' and commit it"; exit 1; }
-          pages=$(find dist -name index.html | wc -l)
-          echo "publishing $pages page(s), $(du -sh dist | cut -f1)"
+          test -f public/index.html || { echo "public/index.html is missing: the build did not run"; exit 1; }
+          pages=$(find public -name index.html | wc -l)
+          echo "publishing $pages page(s), $(du -sh public | cut -f1)"
+
+      # the site must hold the test blog, and every link must carry the folder
+      # the site is published in, or the pages break once they are online
+      - name: Check the build is the test blog
+        run: |
+          base=$(awk '$1=="base:" {print $2}' baumkuchen.yml)
+          published=$(grep -oE '[0-9]+ published' build.log | grep -oE '[0-9]+' | head -1)
+          built=$(find public/post -name index.html | wc -l)
+          test -n "$published" || { echo "the build said nothing about the posts"; exit 1; }
+          test "$published" = "$built" || { echo "the program published $published post(s) and the build holds $built"; exit 1; }
+          test "$published" -gt 0 || { echo "the test blog published nothing"; exit 1; }
+          if [ -n "$base" ]; then
+            stray=$(grep -rhoE '(href|src)="/[^/"][^"]*"' public --include='*.html' | grep -v "=\"$base/" | sort -u || true)
+            if [ -n "$stray" ]; then
+              echo "these links do not carry $base:"; echo "$stray"; exit 1
+            fi
+          fi
+          echo "the test blog is built: $built post page(s), every link under ${base:-the root}"
 
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: dist
+          path: public
       - id: deploy
         uses: actions/deploy-pages@v5

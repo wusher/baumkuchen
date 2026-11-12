@@ -130,8 +130,8 @@ func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, filepath.Dir(indexPath), filepath.Base(indexPath),
-		strings.Replace(string(index), `<p class="eyebrow posts">posts</p>`,
-			`<p class="eyebrow posts">fresh template</p>`, 1))
+		strings.Replace(string(index), `<ol class="feed" role="list" aria-label="posts">`,
+			`<ol class="feed fresh" role="list" aria-label="posts">`, 1))
 	write(t, filepath.Join(root, "static"), "style.css", "body { color: blue; }")
 	afterPage := servedIndex(site)
 	afterVersion := reloadVersions(t, site)
@@ -147,7 +147,7 @@ func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
 	if !strings.Contains(beforePage, "/__baumkuchen_reload") {
 		t.Error("the served page does not carry the live reload watcher")
 	}
-	if !strings.Contains(afterPage, "fresh template") {
+	if !strings.Contains(afterPage, `class="feed fresh"`) {
 		t.Error("a template edit did not reach the next request")
 	}
 	if strings.Contains(exported.String(), "/__baumkuchen_reload") {

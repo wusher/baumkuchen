@@ -1,8 +1,8 @@
 The test blog
 =============
 
-A folder of posts made for the test, not for publishing. The writing is
-synthetic: it was written to exercise the site, and it says nothing about any
+A folder of posts and pages made for the test, not for publishing. The writing
+is synthetic: it was written to exercise the site, and it says nothing about any
 real person, place or study.
 
 What is here
@@ -27,6 +27,22 @@ The pictures live in images/ and are served at /media/, like any other picture
 the site holds. They were drawn for this test: simple diagrams, made as
 vector drawings and saved as PNG files.
 
+The pages
+---------
+
+Three files here are pages and not posts. A page is a file whose front matter
+says `pinned: true`:
+
+    about.md              what the test blog is
+    how-to-read.md        how the depth slider and the keyboard work
+    colophon.md           how the site is built and published
+
+A pinned page stands above every article on the index, in the row at the top
+of it, and it drops the furniture of a post: no date, no tag, no reading time
+on the index, and no meta line on its own page. It keeps the slider, so it is
+written at all five depths like an article, and it carries its own accent
+colour. The articles below are unchanged and are still the ten articles.
+
 Running it
 ----------
 
@@ -36,8 +52,8 @@ is a second, separate set, so it is named on the command line:
     make release
     ./build/baumkuchen -posts test-blog -addr 127.0.0.1:8080
 
-The live site then answers on http://127.0.0.1:8080 with these ten posts. The
-static build works the same way:
+The live site then answers on http://127.0.0.1:8080 with these ten articles
+and the three pages above them. The static build works the same way:
 
     ./build/baumkuchen -posts test-blog -export out
 

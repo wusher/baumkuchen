@@ -1,7 +1,9 @@
-# the built site is kept: it is what gets pushed. See `make export`, which
-# empties the folder first so a renamed post leaves no orphan behind.
+# the built site is not kept: it is what a run makes, and the repository holds
+# the program that makes it. See `make export`, which empties the folder
+# first so a renamed post leaves no orphan behind.
+dist/
 
-# the compiled server: make build writes it
+# the compiled program: make build writes it
 baumkuchen
 
 # the finished programs: make release and make bundle write them

@@ -1,82 +1,81 @@
-# Four Depths
+# Baumkuchen
 
-A small Go blog that serves markdown from `posts/`. A post carries the same
-idea at up to five lengths, and a slider moves the reader between the ones it
-has. New words fill the page as the text grows, and drain away as it shrinks.
-
-## Run it
-
-    make setup     # download the Go modules
-    make run       # http://localhost:8080
-    make new       # start a new draft; it asks for the title
-    make audit     # check the posts before you publish
-    make stats     # the words in each depth, and the time to read
-    make export    # build the static site into ./dist
-    make lint      # repair the format, then vet
-    make build     # a single binary, templates and assets included
-    make release   # the finished program, with its name in it
-    make install   # build and install into ~/.local/bin
-    make smoke     # prove the finished program stands on its own
-
-## The program on its own
+A static site generator for a blog that carries the same idea at up to five
+lengths: one sentence, one paragraph, three paragraphs, a page, three pages.
+The reader moves between the lengths a post has, with a slider.
 
 The program is one file. The templates, the stylesheet, the script and the
 settings are built into it, so a copy of it runs anywhere: it needs the folder
 it was made in for nothing at all.
 
-    make release                     # ./build/baumkuchen
-    ./build/baumkuchen -version
+The writing is not built into it. The writing is the work, and it stays where
+the writer keeps it. The program is told where it is.
 
-The **posts** are not built in. They are the writing, and they stay where the
-writer keeps them. The program is told where they are:
+## The short version
 
-    ./build/baumkuchen test-blog/                     # this folder (relative or absolute)
-    ./build/baumkuchen -posts ~/blog                  # the explicit flag works too
-    BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen         # the same, from the environment
-    ./build/baumkuchen -posts ~/blog -config my.yml    # with other settings
+    make setup                                        # the Go modules, and the link to the writing
+    make release                                      # ./build/baumkuchen, with its name in it
+    ./build/baumkuchen -posts ~/blog -export out     # the static site, written into out/
 
-The first one that is there wins: the positional folder or `-posts` flag, then
-the environment, then the `posts:` line in the settings file. Pass only one
-folder, using either the positional argument or `-posts`, not both. Put flags
-before the positional folder, for example `baumkuchen -addr :9090 test-blog/`. A folder that is not there is reported by
-name, rather than quietly giving an empty site.
+Those three lines are the whole of it: one program that reads a folder of
+markdown and writes a site of plain files. The files go to any static host.
+The same program can serve the site while you write.
 
-There are two ways to run it.
+`make setup` asks where the writing lives when `./posts` does not point at a
+folder yet, and stops with the line to type when there is nobody there to ask.
+`scripts/link-posts.sh ~/blog` makes the link without a question.
+
+## The two ways to run it
 
 **The static site.** The build writes the whole site as plain files and stops.
 
     ./build/baumkuchen -posts ~/blog -export out
 
-**The live site.** The server answers on an address and rereads the posts when
-a file changes, so you can edit a post and refresh the page.
+**The live site.** The server answers on an address and rereads the writing
+when a file changes, so you can edit a post and refresh the page.
 
     ./build/baumkuchen -posts ~/blog -addr 127.0.0.1:8080
 
-Both work the same whether the posts are in a folder or inside the program.
+Both work the same whether the writing is in a folder or inside the program.
 
-### One file with the posts inside
+## Where the writing comes from
 
-A copy of the program with the posts in it is made on purpose, by naming the
+The first one that is given wins: the folder named on the command line, then
+the environment, then the `posts:` line in the settings file.
+
+    ./build/baumkuchen ~/blog                    # a folder, as an argument
+    ./build/baumkuchen -posts ~/blog            # the same, as a flag
+    BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen  # the same, from the environment
+    ./build/baumkuchen -posts ~/blog -config my.yml   # with other settings
+
+Name one folder only, either as the argument or with `-posts`, not both. The
+flags go before the folder when it is given as an argument, so
+`baumkuchen -export out ~/blog` is the way to say it. A folder that is not
+there is reported by name, rather than quietly giving an empty site.
+
+### One file with the writing inside
+
+A copy of the program with the writing in it is made on purpose, by naming the
 folder to put in. Nothing is ever put inside a program by accident.
 
     make bundle CONTENT=~/blog          # ./build/baumkuchen-bundle
     ./build/baumkuchen-bundle -export out
 
 That one file builds the site and serves it, with nothing else on the machine:
-the posts, the templates, the stylesheet and the settings are all in it.
+the writing, the templates, the stylesheet and the settings are all in it.
 
-### Install
+## Install
 
     make install                       # ~/.local/bin/baumkuchen
     baumkuchen -posts ~/blog
 
-Make sure `~/.local/bin` is on your `PATH`. Only the program is installed;
-posts stay in the folder you choose. Override `PREFIX` for another location,
-or use `DESTDIR` to stage an installation for packaging:
+Make sure `~/.local/bin` is on your `PATH`. Only the program is installed; the
+writing stays in the folder you choose. Override `PREFIX` for another
+location, or use `DESTDIR` to stage an installation for packaging:
 
     make install PREFIX=/usr/local DESTDIR=/tmp/package
 
-### The build
+## The build
 
     make build        # ./baumkuchen, for the work in progress
     make release      # ./build/baumkuchen, with the version in it
@@ -98,7 +97,30 @@ same file:
 `make smoke` is the check that matters: it copies the finished program out of
 the repository, writes some posts for the test, builds the site, serves it,
 changes a post and sees the change, and does the same with a copy that has the
-posts inside. The tests in the repository do the same in Go.
+writing inside. The tests in the repository do the same in Go.
+
+## The targets
+
+    make setup     # the Go modules, and the link to the writing
+    make link      # point ./posts at the folder where the writing lives
+    make run       # the live site, on the address in the settings
+    make new       # a new draft; it asks for the title
+    make audit     # what is written, and what is wrong with it
+    make stats     # the same table, with the numbers only
+    make export    # the static site, into the folder in the settings
+    make lint      # repair the format, then report what is left
+    make check     # the format and the vet; changes no file
+    make test      # the tests
+    make cover     # the tests, and what they cover
+    make build     # the program, for the work in progress
+    make release   # the finished program, with the version in it
+    make releases  # the finished program, for every system
+    make bundle    # one file with the program and the writing inside it
+    make install   # the finished program, into ~/.local/bin
+    make smoke     # the finished program, out of the repository, doing its work
+    make clean     # the compiled programs
+
+`make help` prints the same list, with one line about each.
 
 ## The settings
 
@@ -121,16 +143,18 @@ A key that is not a setting stops the run and names itself, because a typo
 that is swallowed is a setting that quietly does nothing. The Makefile reads
 the folders out of the same file, so there is one place to change them.
 
-## Where the posts live
+## Where the writing lives
 
-Every folder under `posts/` is read, however deep. The folders are for you, not
-for the site: the file name is still the URL, so `posts/2026/why-rivers.md`
-answers at `/post/why-rivers`.
+Every folder under the writing folder is read, however deep. The folders are
+for you, not for the site: the file name is still the URL, so
+`~/blog/2026/why-rivers.md` answers at `/post/why-rivers`.
 
-The folder is wherever the writing is. In this repository it is a link to the
-folder outside, and the link is followed once, when the folder is opened, so
-every path inside is a real one. A program that was copied somewhere else
-reads the same posts from the folder you name with `-posts`.
+In this repository the writing is a link to a folder outside it. The link is
+per machine: `make setup` asks where the writing lives and makes it, or
+`scripts/link-posts.sh ~/blog` makes it without a question. The link is
+followed once, when the folder is opened, so every path inside is a real one.
+A program that was copied somewhere else reads the same writing from the
+folder you name with `-posts`.
 
 Two folders are stepped over: `images/`, which holds the pictures, and anything
 whose name starts with a dot.
@@ -146,9 +170,9 @@ never silent.
 
 ## The publishing rule
 
-A file in `posts/` becomes a post when it holds **one or more** of the five
-depth headings. A file with none of them stays invisible: it is not on the
-index, and its URL gives a 404. Nothing else controls publication.
+A file in the writing folder becomes a post when it holds **one or more** of
+the five depth headings. A file with none of them stays invisible: it is not
+on the index, and its URL gives a 404. Nothing else controls publication.
 
 A post keeps the order below, whichever depths it carries. It can stop early,
 or skip a depth in the middle. With one depth only, the page shows no slider.
@@ -189,14 +213,15 @@ the reader sees above the slider.
   continuation of the one above it. A reader can arrive at any depth first.
 * Keep it brief. The `Sentence` depth stays at or under **35 words**, and a
   paragraph runs under **120 words** — at most one paragraph in four may go over.
-  `post_test.go` enforces both across `posts/`.
+  `parse_test.go` holds the real writing to both, where the writing is there
+  to be read.
 * Use the markdown: bold and italics for terms, `##` inside a long depth,
   bold run-in heads inside a medium one, lists, tables, code fences, images.
 * The first `# ` line is the title. The file name is the URL.
 * The index shows the `Sentence` depth, or the shortest depth a post has.
-* Pictures go in `posts/images/` and are written as `![alt](/media/name.jpg)`.
-  A line of `*italic*` under the picture becomes its caption. No build is
-  needed: the folder is served from disk.
+* Pictures go in `images/` beside the writing and are written as
+  `![alt](/media/name.jpg)`. A line of `*italic*` under the picture becomes
+  its caption. No build is needed to see them: the folder is served from disk.
 * End the path with `#left`, `#right` or `#center` to place a picture:
   `![alt](/media/name.jpg#right)`. `#left` and `#right` float it and the text
   wraps beside it; `#center` sits it in the middle with no wrap. All three are
@@ -238,51 +263,11 @@ The reader's depth is kept between posts, in `localStorage` under `depth`. A
 post that does not carry the chosen depth opens at the nearest one it has,
 and leaves the choice alone; only moving the slider sets a new one.
 
-The server rereads `posts/` when a file changes, so you can edit a post and
+The server rereads the writing when a file changes, so you can edit a post and
 refresh the page. When it runs from the project folder, it also live reloads
 `templates/*.html` and `static/*.css`: template edits refresh the browser and
 stylesheet edits appear without a page refresh. Static exports still use the
 files embedded in the binary.
-
-`audit.sh` gives one row per file — the words in each of the five depths, the
-total written, and the time to read the longest depth — and under a row,
-whatever is wrong with that file.
-
-    make audit                  # the table and the findings
-    make stats                  # the table alone
-    scripts/audit.sh --words    # the most words first
-    scripts/audit.sh posts/a.md # one file
-
-The **title carries the verdict**: plain when the file is clean, amber when it
-holds a warning, red when it holds an error. It reports:
-
-* the depth headings a file does not carry, and a heading with nothing under it
-* **a heading of one `#` that names no depth.** The site matches every `#`
-  after the title against the five names; one that matches nothing takes its
-  text with it, and those words never reach the page. This is an error.
-* a missing title, or a missing `date` or `tag`
-* a `Sentence` depth above 35 words, or a `Paragraph` depth at 120 or more
-* a picture the file points at that is not in `posts/images/`
-* a word written twice in a row, where the two words touch
-
-Rows come in the order of the index: pinned first, then the newest. A depth
-that is not written shows a dot. The state — ` draft`, ` pinned` — sits at
-the end of the row on purpose: a mark from a nerd font may take two columns
-while it counts as one character, so nothing that can change width is put to
-the left of a number. Every cell is padded by character, not by byte, because
-`printf` counts bytes and a dot is two of them.
-
-It counts the way the site counts: a picture and its caption are not prose, and
-a code fence does count. It ends with 1 if any file holds an error, and 0 for
-warnings only, so it fits in a hook or a pipeline. A missing depth is a
-warning, because a post may stop early by design, and a `draft: true` file may
-hold nothing at all.
-
-The report is coloured, and a pipe turns the colour off. Two switches change
-that:
-
-    AUDIT_COLOR=always|never   force the colour on or off
-    AUDIT_ICONS=0              plain marks, for a terminal with no nerd font
 
 ## draft and pinned
 
@@ -299,9 +284,9 @@ Two front matter properties change where a file goes.
 
 `true`, `yes`, `on` and `1` all mean yes, in any case. Anything else means no.
 
-**draft** — the post is on the index and at its own URL while `make run` is up,
-with a **draft** mark beside it, so you read it as a reader would. `make export`
-leaves it out: no page, and no line on the index.
+**draft** — the post is on the index and at its own URL while the server is
+up, with a **draft** mark beside it, so you read it as a reader would. The
+build leaves it out: no page, and no line on the index.
 
 **pinned** — the page sits above every post on the index, whatever its date,
 and it drops the furniture of a post: no tag, no date, no depth count. It shows
@@ -340,8 +325,9 @@ whole palette is the block under `the named colours` in `static/style.css`.
 
 ## The build of the site
 
-    make export             # into ./dist
+    make export             # into ./dist, from the folder in the settings
     make export DIST=out    # somewhere else
+    ./build/baumkuchen -posts ~/blog -export out    # from any folder
 
 It writes the URLs the server already answers on, so nothing changes when you
 deploy:
@@ -360,18 +346,39 @@ The finished program does the same build, without the repository:
 
     ./build/baumkuchen -posts ~/blog -export out
 
+The built site is not kept in the repository. It is what a run makes, and the
+repository holds the program that makes it.
+
 ### The folder the site is published in
 
 Every link the site writes starts at the root, because that is where the server
 answers. A GitHub **project page** is served from a folder — this one is at
-`/baumkuchen/` — so the build puts that folder in front of each link:
+`/baumkuchen/` — so the build puts that folder in front of each link. The
+setting is one line in `baumkuchen.yml`:
 
-    BASE ?= /baumkuchen
+    base: /baumkuchen
 
-Leave `BASE` empty for a custom domain or a user site, both of which are served
-from the root. Only `href="/…"` and `src="/…"` are touched, so an address with
-a scheme, or one that starts `//`, is left alone. The running server ignores
-`BASE` altogether: `make run` always answers at the root.
+A flag beats the file:
+
+    ./build/baumkuchen -posts ~/blog -base /blog -export out
+
+Leave `base` empty for a custom domain or a user site, both of which are
+served from the root. Only `href="/…"` and `src="/…"` are touched, so an
+address with a scheme, or one that starts `//`, is left alone. The running
+server ignores `base` altogether: the live site always answers at the root.
+
+## Publishing
+
+The test blog in `test-blog/` is published by itself. A push to `master` that
+touches the program, the templates, the stylesheet, the settings or the test
+blog builds it with this program and puts it on GitHub Pages:
+
+    https://wusher.github.io/baumkuchen/
+
+The workflow is `.github/workflows/pages.yml`. It builds the test blog, checks
+that the pages are the test blog and that every link carries the folder the
+site is published in, and then publishes the result. Nothing is done by hand,
+and no password is kept in the repository.
 
 ## depth
 
@@ -428,16 +435,60 @@ Only the depth on screen is in the page for a reader view or a clipper: the
 others carry `aria-hidden` and `inert`, which is what those tools read. A
 clipping holds one depth, not five.
 
+## The audit
+
+`scripts/audit.sh` gives one row per file — the words in each of the five
+depths, the total written, and the time to read the longest depth — and under
+a row, whatever is wrong with that file.
+
+    make audit                  # the table and the findings
+    make stats                  # the table alone
+    scripts/audit.sh --words    # the most words first
+    scripts/audit.sh posts/a.md # one file
+
+The **title carries the verdict**: plain when the file is clean, amber when it
+holds a warning, red when it holds an error. It reports:
+
+* the depth headings a file does not carry, and a heading with nothing under it
+* **a heading of one `#` that names no depth.** The site matches every `#`
+  after the title against the five names; one that matches nothing takes its
+  text with it, and those words never reach the page. This is an error.
+* a missing title, or a missing `date` or `tag`
+* a `Sentence` depth above 35 words, or a `Paragraph` depth at 120 or more
+* a picture the file points at that is not in `images/`
+* a word written twice in a row, where the two words touch
+
+Rows come in the order of the index: pinned first, then the newest. A depth
+that is not written shows a dot. The state — ` draft`, ` pinned` — sits at
+the end of the row on purpose: a mark from a nerd font may take two columns
+while it counts as one character, so nothing that can change width is put to
+the left of a number. Every cell is padded by character, not by byte, because
+`printf` counts bytes and a dot is two of them.
+
+It counts the way the site counts: a picture and its caption are not prose, and
+a code fence does count. It ends with 1 if any file holds an error, and 0 for
+warnings only, so it fits in a hook or a pipeline. A missing depth is a
+warning, because a post may stop early by design, and a `draft: true` file may
+hold nothing at all.
+
+The report is coloured, and a pipe turns the colour off. Two switches change
+that:
+
+    AUDIT_COLOR=always|never   force the colour on or off
+    AUDIT_ICONS=0              plain marks, for a terminal with no nerd font
+
 ## The scripts
 
     scripts/new-draft.sh  ## a new draft, with the skeleton written for you
     scripts/audit.sh      ## what is written, and what is wrong with it
+    scripts/link-posts.sh ## point ./posts at the folder where the writing lives
+    scripts/smoke.sh      ## the finished program, out of the repository
 
 `new-draft.sh` asks for the title, or takes it as an argument. It builds the
 file name from the title (lower case, hyphens), refuses to write over a file
-that is already there, and prints the path it wrote. The file lands in
-`posts/posts/` and carries every setting a post can take, so nothing has to be
-remembered:
+that is already there, and prints the path it wrote. The file lands in the
+writing folder, under a folder named `posts`, and carries every setting a post
+can take, so nothing has to be remembered:
 
     ---
     date: 2026-08-20
@@ -451,7 +502,7 @@ remembered:
 An empty setting does nothing, so a file can be left as it is written. Give
 `INTO` to write somewhere else: `INTO=_drafts scripts/new-draft.sh "…"`.
 
-`audit.sh` reads every file in `posts/` and reports:
+`audit.sh` reads every file in the writing folder and reports:
 
 * the depth headings a file does not carry, and a heading with nothing under it
 * **a heading of one `#` that names no depth.** The site matches every `#`
@@ -459,7 +510,7 @@ An empty setting does nothing, so a file can be left as it is written. Give
   text with it, and those words never reach the page. This is an error.
 * a missing title, or a missing `date` or `tag`
 * a `Sentence` depth above 35 words, or a `Paragraph` depth at 120 or more
-* a picture the file points at that is not in `posts/images/`
+* a picture the file points at that is not in `images/`
 * a word written twice in a row, where the two words touch
 
 Beside each file name it shows what the file is:  **draft** (out of the
@@ -477,24 +528,30 @@ Two switches change that:
     AUDIT_COLOR=always|never   force the colour on or off
     AUDIT_ICONS=0              plain marks, for a terminal with no nerd font
 
-## Files
+## The files
 
     main.go     the command: the flags, the settings, the two ways to run
     internal/blog/  the site: the posts, the pages, the build, the server
-    internal/content/  where the posts come from: a folder, or files in the program
-    internal/bundle/   putting the posts inside a copy of the program
+    internal/content/  where the writing comes from: a folder, or files in the program
+    internal/bundle/   putting the writing inside a copy of the program
     templates/  layout, index, post, 404
     static/     one stylesheet, one script
-    posts/      the posts, which live outside this repository
-    posts/images/  pictures, served at /media/
-    test-blog/  a second set of posts, made for the test
+    scripts/    the audit, the new draft, the link, the smoke test
+    test-blog/  a second set of writing, made for the test
+    posts/      a link to the writing, which lives outside this repository
+    baumkuchen.yml  the settings
+    Makefile    the targets above
+    .github/workflows/  the checks on every push, and the publishing
 
-The tests run on posts made for them. The one test that reads the real posts
-skips when they are not there, and runs when `BAUMKUCHEN_POSTS` names them.
+The tests run on writing made for them. The one test that reads the real
+posts skips when they are not there, and runs when `BAUMKUCHEN_POSTS` names
+them.
 
 `test-blog/` holds ten articles about basic science, each written at all five
-depths and each with its own pictures. They are written for the test, and they
-are read like any other folder of posts:
+depths and each with its own pictures, and three pages — `about.md`,
+`how-to-read.md` and `colophon.md` — which are pinned, so they stand in a row
+at the top of the index. `test-blog/NOTES.txt` says more about the folder.
+They are read like any other folder of writing:
 
     ./build/baumkuchen -posts test-blog -addr 127.0.0.1:8080
     POSTS=test-blog IMAGES=test-blog/images scripts/audit.sh
@@ -507,4 +564,3 @@ are read like any other folder of posts:
     make smoke   # the finished program, out of the repository, doing its work
 
 The same checks run on every push, in `.github/workflows/ci.yml`.
-

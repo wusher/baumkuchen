@@ -200,30 +200,24 @@ footer.site p { margin: 0; color: var(--muted); font: 400 .85rem/1.5 var(--sans)
 .intro p { color: var(--ink-2); font-size: 1.14rem; max-width: 32rem; }
 
 .feed { list-style: none; margin: 0; padding: 0; }
-/* A small label over each group says what the group is, so the titles do not
-   have to carry that themselves. The air above the page sits on the first
-   label, not on the list. */
-.eyebrow {
-  font: 500 .72rem/1 var(--sans); letter-spacing: .16em;
-  color: var(--muted); margin: 0 0 .95rem;
-}
-.eyebrow.pages { margin-top: 1.8rem; }
-.eyebrow.posts { margin-top: 1.7rem; }
 
-/* Wide enough for the corners: the label over the pages is the first line of
-   the column, so it stands in the same row as the wordmark and the theme
-   button. This block must come after the margin above, or that one wins. */
-@media (min-width: 1024px) {
-  .eyebrow.pages {
-    display: flex; align-items: center;
-    min-height: var(--row); margin-top: 0;
-  }
+/* The pages stand in a row across the top of the index: a short line of
+   links, not a list that runs down the page. The row wraps onto the next
+   line when the window is too narrow to hold it, so a phone keeps the pages
+   in the same order. */
+.feed.pinned {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: .5rem 1.6rem;
+  /* the room the label over the pages used to take */
+  margin-top: 1.8rem;
 }
+/* the pages stand closer to each other than the posts do */
+.feed.pinned .card { padding: 0; min-width: 0; }
 
-/* The pinned pages are post titles, at the same size, but they stand closer
-   to each other than the posts do: a short list of pages, not a feed. */
-.feed.pinned .card { padding: .55rem 0; }
-.feed.pinned .card:first-child { padding-top: 0; }
+/* the room the label over the posts used to take */
+.feed:not(.pinned) { margin-top: 1.7rem; }
+/* the line between the pages and the posts gives the room of its own */
+.split + .feed { margin-top: 1.4rem; }
 
 /* the one line on the index: it marks where the pages stop and the posts
    start, and it is the only rule in the list */

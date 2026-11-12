@@ -309,6 +309,11 @@ the title and the reading time only, and its own page carries no meta line. It
 keeps the depth slider if it holds more than one depth. Two pinned pages keep
 the newest first.
 
+The pinned pages stand in a row across the top of the index, with no label over
+them, and the posts follow with no label either. The row wraps onto the next
+line when the window is too narrow to hold it, so the pages keep their order on
+a phone.
+
 ## color
 
 A post may take its own accent with `color:` in the front matter. It changes

@@ -23,15 +23,13 @@
 </section>
 
 {{if .Pinned}}
-<p class="eyebrow pages">pages</p>
-<ol class="feed pinned">
+<ol class="feed pinned" role="list" aria-label="pages">
   {{range .Pinned}}{{template "card" .}}{{end}}
 </ol>
 {{if .Posts}}<hr class="split">{{end}}
 {{end}}
 
-{{if .Posts}}<p class="eyebrow posts">posts</p>{{end}}
-<ol class="feed">
+<ol class="feed" role="list" aria-label="posts">
   {{range .Posts}}{{template "card" .}}{{else}}
   {{if not .Pinned}}<li class="card"><p class="lead">No post carries a depth yet.</p></li>{{end}}
   {{end}}

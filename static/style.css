@@ -123,6 +123,7 @@ code, pre, pre *, blockquote, blockquote *, abbr, kbd, samp {
 }
 p, li { text-wrap: pretty; }
 h1, h2, h3, h4 { text-wrap: balance; }
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 /* one focus ring for everything a keyboard can reach */
 :focus-visible {
   outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px;
@@ -227,6 +228,16 @@ footer.site p { margin: 0; color: var(--muted); font: 400 .85rem/1.5 var(--sans)
 }
 .card { padding: 1.9rem 0; }
 .card a { display: block; text-decoration: none; }
+/* the sentence depth stands under the title: the shortest version of the
+   post is its own preview. It is held to three lines, so the feed stays a
+   feed and the post keeps the rest. */
+.card a .lead {
+  margin: .5rem 0 0; color: var(--muted);
+  font-size: .98rem; line-height: 1.62;
+  display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; overflow: hidden;
+}
+.card a .lead p { margin: 0; }
 .card h2 {
   font-size: 1.42rem; margin: 0;
   transition: color .25s var(--ease);
@@ -266,7 +277,18 @@ footer.site p { margin: 0; color: var(--muted); font: 400 .85rem/1.5 var(--sans)
 .depth-row {
   display: flex; align-items: center; gap: .2rem; padding: 0 .1rem;
 }
-.range { flex: 1; min-width: 0; }
+.track { flex: 1; min-width: 0; position: relative; }
+
+/* One mark per depth, under the line, so the reader sees how many stops the
+   slider has and where they are. Each mark is placed where the middle of the
+   thumb comes to rest: half a thumb in from each end. */
+.ticks { position: absolute; left: 0; right: 0; top: 50%; height: 0; pointer-events: none; }
+.ticks i {
+  position: absolute; top: -3px;
+  left: calc(.41rem + (100% - .82rem) * var(--i) / var(--n));
+  width: 2px; height: 6px; margin-left: -1px; border-radius: 1px;
+  background: var(--rule);
+}
 
 /* One step shorter, one step longer. The chevron is drawn at the weight of the
    rules on this page, and the button takes its colour from the same three

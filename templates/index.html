@@ -2,6 +2,7 @@
   <li class="card">
     <a href="/post/{{.Slug}}">
       <h2>{{.Title}}</h2>
+      {{if not .Pinned}}{{with .Lead}}<div class="lead">{{.}}</div>{{end}}{{end}}
     </a>
     {{if or .Draft (not .Pinned)}}
     <p class="meta">

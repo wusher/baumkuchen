@@ -11,11 +11,16 @@ it was made in for nothing at all.
 The writing is not built into it. The writing is the work, and it stays where
 the writer keeps it. The program is told where it is.
 
+**See it run:** the test blog is live at
+<https://wusher.github.io/baumkuchen/>.
+
+![A post at its Paragraph depth, with the depth slider](docs/screenshot.png)
+
 ## The short version
 
-    make setup                                        # the Go modules, and the link to the writing
-    make release                                      # ./build/baumkuchen, with its name in it
-    ./build/baumkuchen -posts ~/blog -export out     # the static site, written into out/
+    make setup                                      # the Go modules, and the link to the writing
+    make release                                    # ./build/baumkuchen, with its name in it
+    ./build/baumkuchen -posts ~/blog -export out    # the static site, written into out/
 
 Those three lines are the whole of it: one program that reads a folder of
 markdown and writes a site of plain files. The files go to any static host.
@@ -32,9 +37,10 @@ folder yet, and stops with the line to type when there is nobody there to ask.
     ./build/baumkuchen -posts ~/blog -export out
 
 **The live site.** The server answers on an address and rereads the writing
-when a file changes, so you can edit a post and refresh the page.
+when a file changes, so you can edit a post and refresh the page. Give
+`-open` and the browser opens on it by itself. Ctrl+C stops it cleanly.
 
-    ./build/baumkuchen -posts ~/blog -addr 127.0.0.1:8080
+    ./build/baumkuchen -posts ~/blog -addr 127.0.0.1:8080 -open
 
 Both work the same whether the writing is in a folder or inside the program.
 
@@ -43,10 +49,10 @@ Both work the same whether the writing is in a folder or inside the program.
 The first one that is given wins: the folder named on the command line, then
 the environment, then the `posts:` line in the settings file.
 
-    ./build/baumkuchen ~/blog                    # a folder, as an argument
-    ./build/baumkuchen -posts ~/blog            # the same, as a flag
-    BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen  # the same, from the environment
-    ./build/baumkuchen -posts ~/blog -config my.yml   # with other settings
+    ./build/baumkuchen ~/blog                          # a folder, as an argument
+    ./build/baumkuchen -posts ~/blog                   # the same, as a flag
+    BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen         # the same, from the environment
+    ./build/baumkuchen -posts ~/blog -config my.yml    # with other settings
 
 Name one folder only, either as the argument or with `-posts`, not both. The
 flags go before the folder when it is given as an argument, so
@@ -66,6 +72,12 @@ the writing, the templates, the stylesheet and the settings are all in it.
 
 ## Install
 
+With Go on the machine, one line installs it from anywhere:
+
+    go install github.com/wusher/baumkuchen@latest
+
+From a clone of the repository:
+
     make install                       # ~/.local/bin/baumkuchen
     baumkuchen -posts ~/blog
 
@@ -81,6 +93,9 @@ location, or use `DESTDIR` to stage an installation for packaging:
     make release      # ./build/baumkuchen, with the version in it
     make releases     # the same, for linux, darwin and windows, on both chips
     make smoke        # prove the program stands on its own
+
+`make releases` also writes `build/sha256sums.txt`, so a downloaded copy can
+be checked against the build.
 
 `make release` writes the name of the build into the program, so a copy can
 say which one it is:
@@ -323,6 +338,30 @@ A name that is not on the list is dropped: the page keeps the site's accent,
 and `make audit` reports the line. To change a value, or to add a name, the
 whole palette is the block under `the named colours` in `static/style.css`.
 
+## depth
+
+A post may open at a depth of its own with `depth:` in the front matter. It
+takes the same five names the headings take.
+
+    ---
+    depth: short
+    ---
+
+Three things can say which depth a post opens at, and they rank:
+
+1. **the address** — `#medium` in a link the reader followed
+2. **the post** — this `depth:` line
+3. **the reader** — the depth they last chose, kept in `localStorage`
+
+So a post that is worth meeting at its Short version says so, and that beats
+the reader's standing choice; but a link someone sent them still wins, because
+that link was made on purpose. Moving the slider still writes the reader's
+choice, so the next post they open follows them again.
+
+A name that is not one of the five is dropped, and the post opens the way every
+other post does. `make audit` reports that, and also a `depth:` naming a depth
+the post does not carry — the post still opens at the nearest one it has.
+
 ## The build of the site
 
     make export             # into ./dist, from the folder in the settings
@@ -341,10 +380,6 @@ deploy:
 A draft never reaches it, and neither does a file with no depth. `make export`
 empties the folder first, so a post you renamed leaves no page behind; the Go
 code itself deletes nothing, and the `rm` sits on the line that does it.
-
-The finished program does the same build, without the repository:
-
-    ./build/baumkuchen -posts ~/blog -export out
 
 The built site is not kept in the repository. It is what a run makes, and the
 repository holds the program that makes it.
@@ -379,30 +414,6 @@ The workflow is `.github/workflows/pages.yml`. It builds the test blog, checks
 that the pages are the test blog and that every link carries the folder the
 site is published in, and then publishes the result. Nothing is done by hand,
 and no password is kept in the repository.
-
-## depth
-
-A post may open at a depth of its own with `depth:` in the front matter. It
-takes the same five names the headings take.
-
-    ---
-    depth: short
-    ---
-
-Three things can say which depth a post opens at, and they rank:
-
-1. **the address** — `#medium` in a link the reader followed
-2. **the post** — this `depth:` line
-3. **the reader** — the depth they last chose, kept in `localStorage`
-
-So a post that is worth meeting at its Short version says so, and that beats
-the reader's standing choice; but a link someone sent them still wins, because
-that link was made on purpose. Moving the slider still writes the reader's
-choice, so the next post they open follows them again.
-
-A name that is not one of the five is dropped, and the post opens the way every
-other post does. `make audit` reports that, and also a `depth:` naming a depth
-the post does not carry — the post still opens at the nearest one it has.
 
 ## Moving between the depths
 
@@ -479,10 +490,10 @@ that:
 
 ## The scripts
 
-    scripts/new-draft.sh  ## a new draft, with the skeleton written for you
-    scripts/audit.sh      ## what is written, and what is wrong with it
-    scripts/link-posts.sh ## point ./posts at the folder where the writing lives
-    scripts/smoke.sh      ## the finished program, out of the repository
+    scripts/new-draft.sh     # a new draft, with the skeleton written for you
+    scripts/audit.sh         # what is written, and what is wrong with it
+    scripts/link-posts.sh    # point ./posts at the folder where the writing lives
+    scripts/smoke.sh         # the finished program, out of the repository
 
 `new-draft.sh` asks for the title, or takes it as an argument. It builds the
 file name from the title (lower case, hyphens), refuses to write over a file
@@ -502,31 +513,8 @@ can take, so nothing has to be remembered:
 An empty setting does nothing, so a file can be left as it is written. Give
 `INTO` to write somewhere else: `INTO=_drafts scripts/new-draft.sh "…"`.
 
-`audit.sh` reads every file in the writing folder and reports:
-
-* the depth headings a file does not carry, and a heading with nothing under it
-* **a heading of one `#` that names no depth.** The site matches every `#`
-  after the title against the five names; one that matches nothing takes its
-  text with it, and those words never reach the page. This is an error.
-* a missing title, or a missing `date` or `tag`
-* a `Sentence` depth above 35 words, or a `Paragraph` depth at 120 or more
-* a picture the file points at that is not in `images/`
-* a word written twice in a row, where the two words touch
-
-Beside each file name it shows what the file is:  **draft** (out of the
-build) and  **pinned** (top of the index).
-
-It counts words the way the site counts them: a picture and its caption are not
-prose, and the words inside a code fence do count. It ends with 1 if any file
-holds an error, and 0 for warnings only, so it fits in a hook or a pipeline. A
-missing depth is a warning, because a post may stop early by design, and a
-`draft: true` file may hold nothing at all.
-
-The report is coloured, with nerd font icons. A pipe turns the colour off.
-Two switches change that:
-
-    AUDIT_COLOR=always|never   force the colour on or off
-    AUDIT_ICONS=0              plain marks, for a terminal with no nerd font
+`audit.sh` is the audit above, and the section **The audit** says what it
+reports and how it counts.
 
 ## The files
 
@@ -537,6 +525,7 @@ Two switches change that:
     templates/  layout, index, post, 404
     static/     one stylesheet, one script
     scripts/    the audit, the new draft, the link, the smoke test
+    docs/       the screenshot in this README
     test-blog/  a second set of writing, made for the test
     posts/      a link to the writing, which lives outside this repository
     baumkuchen.yml  the settings

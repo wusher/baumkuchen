@@ -1,4 +1,4 @@
-module baumkuchen
+module github.com/wusher/baumkuchen
 
 go 1.22
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -151,22 +150,4 @@ func cleanBase(base string) string {
 		return ""
 	}
 	return "/" + base
-}
-
-func copyFile(from, to string) error {
-	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
-		return err
-	}
-	in, err := os.Open(from)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(to)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
 }

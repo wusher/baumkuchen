@@ -1,9 +1,9 @@
 // Baumkuchen is a blog that serves markdown from a folder, at up to five
 // lengths.
 //
-//	baumkuchen                          # serve the posts, live, on the address in the settings
-//	baumkuchen ~/blog                  # serve the posts in another folder
-//	baumkuchen -posts ~/blog -export out   # write the static site, then stop
+//	baumkuchen                              # serve the posts, live, on the address in the settings
+//	baumkuchen ~/blog                       # serve the posts in another folder
+//	baumkuchen -posts ~/blog -export out    # write the static site, then stop
 //
 // The program is one file. The templates, the stylesheet, the script and the
 // settings are built into it, so a copy of it runs anywhere, without the
@@ -23,14 +23,19 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
+	"syscall"
+	"time"
 
-	"baumkuchen/internal/blog"
-	"baumkuchen/internal/bundle"
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/blog"
+	"github.com/wusher/baumkuchen/internal/bundle"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 //go:embed templates/*.html
@@ -51,30 +56,39 @@ var (
 )
 
 func main() {
+	log.SetFlags(0)
+	// the flag package would print its own error and the whole help; a short
+	// hint after the error reads better, so the parse is handled by hand
+	flag.CommandLine.Init("baumkuchen", flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+	flag.Usage = func() {}
 	conf := flag.String("config", "baumkuchen.yml", "the settings file")
-	addr := flag.String("addr", "", "listen address")
-	dir := flag.String("posts", "", "folder with the markdown posts")
-	out := flag.String("export", "", "write the static site to this folder, then stop")
+	addr := flag.String("addr", "", "the address the server listens on, as in :8080")
+	dir := flag.String("posts", "", "the folder with the markdown posts")
+	out := flag.String("export", "", "write the static site to this folder, then stop; \"-\" takes the folder in the settings")
 	base := flag.String("base", "", "the folder the built site is published in, as in /baumkuchen")
 	title := flag.String("title", "", "the name of the site")
 	showVersion := flag.Bool("version", false, "print the version and stop")
-	pack := flag.String("bundle", "", "write a copy of this program with the content in this folder inside it")
-	to := flag.String("o", "", "where to write that copy")
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] [posts-directory]\n\n", os.Args[0])
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-	postsDir, postsGiven, err := postsArgument(flag.Args(), *dir, given("posts"))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		flag.Usage()
+	open := flag.Bool("open", false, "open the browser once the server is up")
+	pack := flag.String("bundle", "", "write a copy of this program with the posts in this folder inside it, then stop")
+	to := flag.String("o", "", "where -bundle writes that copy")
+	switch err := flag.CommandLine.Parse(os.Args[1:]); {
+	case errors.Is(err, flag.ErrHelp):
+		printUsage(os.Stdout)
+		return
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "%v\nrun baumkuchen -h for help\n", err)
 		os.Exit(2)
 	}
 
 	if *showVersion {
 		fmt.Println(versionLine())
 		return
+	}
+	postsDir, postsGiven, err := postsArgument(flag.Args(), *dir, given("posts"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\nrun baumkuchen -h for help\n", err)
+		os.Exit(2)
 	}
 	if *pack != "" {
 		if err := makeBundle(*pack, *to); err != nil {
@@ -149,9 +163,59 @@ func main() {
 	if liveReload {
 		log.Printf("live reload watching templates/*.html and static/*.css")
 	}
-	log.Printf("the blog is on http://%s", host(cfg.Addr))
+	url := "http://" + host(cfg.Addr)
+	log.Printf("the blog is on %s", url)
+	if *open {
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			openBrowser(url)
+		}()
+	}
 	if err := site.Serve(cfg.Addr); err != nil {
+		if errors.Is(err, syscall.EADDRINUSE) {
+			log.Fatalf("the address %s is in use; give another with -addr", cfg.Addr)
+		}
 		log.Fatal(err)
+	}
+}
+
+// printUsage writes the help.
+func printUsage(w io.Writer) {
+	fmt.Fprint(w, `Baumkuchen serves a folder of markdown as a blog, at up to five lengths.
+
+Usage:
+  baumkuchen [flags] [posts-folder]
+
+Examples:
+  baumkuchen ~/blog                     serve the posts, live
+  baumkuchen -export out ~/blog         write the static site, then stop
+  baumkuchen -bundle ~/blog -o site     a copy of the program with the posts inside
+
+The posts come from the folder on the command line, then from
+BAUMKUCHEN_POSTS, then from the settings file, then from the
+posts inside the program, when it carries any.
+
+Flags:
+`)
+	flag.CommandLine.SetOutput(w)
+	flag.PrintDefaults()
+	flag.CommandLine.SetOutput(io.Discard)
+}
+
+// openBrowser asks the desktop to open the address. A desktop that cannot is
+// told about, and the server runs on regardless.
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		log.Printf("open %s yourself: %v", url, err)
 	}
 }
 

@@ -4,20 +4,25 @@ package blog
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // Config is what a site needs to run. The two file systems are handed in by
@@ -153,7 +158,8 @@ func (s *Site) routes() http.Handler {
 	return mux
 }
 
-// Serve answers on addr until it cannot.
+// Serve answers on addr until it cannot, or until the program is told to
+// stop. Ctrl+C lets the requests in flight finish before the server goes.
 func (s *Site) Serve(addr string) error {
 	srv := &http.Server{
 		Addr:         addr,
@@ -161,7 +167,22 @@ func (s *Site) Serve(addr string) error {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-	return srv.ListenAndServe()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	failed := make(chan error, 1)
+	go func() { failed <- srv.ListenAndServe() }()
+	select {
+	case err := <-failed:
+		return err
+	case <-ctx.Done():
+		log.Printf("stopping")
+		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdown); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	}
 }
 
 func (s *Site) reload() {
@@ -230,17 +251,22 @@ func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	return t.ExecuteTemplate(w, "layout", data)
 }
 
-func (s *Site) render(w http.ResponseWriter, name string, data pageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+// render writes one page, whole or not at all: the page is built first, so a
+// template that fails gives a plain 500 with the error, never a half page or
+// an empty 200.
+func (s *Site) render(w http.ResponseWriter, status int, name string, data pageData) {
 	var page bytes.Buffer
 	if err := s.renderTo(&page, name, data); err != nil {
 		log.Printf("render %s: %v", name, err)
+		http.Error(w, fmt.Sprintf("render %s: %v", name, err), http.StatusInternalServerError)
 		return
 	}
 	body := page.Bytes()
 	if s.liveReload {
 		body = bytes.Replace(body, []byte("</body>"), []byte(liveReloadScript+"</body>"), 1)
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	_, _ = w.Write(body)
 }
 
@@ -265,6 +291,10 @@ const liveReloadScript = `<script>
 (() => {
   let previous;
   async function check() {
+    if (document.hidden) {
+      setTimeout(check, 2000);
+      return;
+    }
     try {
       const response = await fetch('/__baumkuchen_reload', {cache: 'no-store'});
       const next = await response.json();
@@ -294,7 +324,7 @@ func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reload()
 	pinned, rest := splitPinned(s.store.Index())
-	s.render(w, "index.html", pageData{
+	s.render(w, http.StatusOK, "index.html", pageData{
 		Title:  s.title,
 		Pinned: pinned,
 		Posts:  rest,
@@ -309,10 +339,9 @@ func (s *Site) handlePost(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w)
 		return
 	}
-	s.render(w, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color})
+	s.render(w, http.StatusOK, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color})
 }
 
 func (s *Site) notFound(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNotFound)
-	s.render(w, "404.html", pageData{Title: "Not here"})
+	s.render(w, http.StatusNotFound, "404.html", pageData{Title: "Not here"})
 }

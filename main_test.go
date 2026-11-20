@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"baumkuchen/internal/blog"
+	"github.com/wusher/baumkuchen/internal/blog"
 )
 
 func TestPostsArgument(t *testing.T) {

@@ -96,24 +96,6 @@ func TestExportRefusesAPathItCannotMake(t *testing.T) {
 	}
 }
 
-// A picture that is not there stops the copy, with a word about which one.
-func TestCopyFileRefusesAMissingSource(t *testing.T) {
-	// arrange
-	from := filepath.Join(t.TempDir(), "no-such-file.jpg")
-	to := filepath.Join(t.TempDir(), "copy.jpg")
-
-	// act
-	err := copyFile(from, to)
-
-	// assert
-	if err == nil {
-		t.Fatal("copying a file that is not there must give an error")
-	}
-	if !strings.Contains(err.Error(), "no-such-file") {
-		t.Errorf("the error does not name the file: %v", err)
-	}
-}
-
 // The index draws its one line only when there are two groups to separate.
 func TestIndexRuleNeedsBothGroups(t *testing.T) {
 	// arrange

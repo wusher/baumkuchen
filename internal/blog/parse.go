@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/content"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	gmhtml "github.com/yuin/goldmark/renderer/html"

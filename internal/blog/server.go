@@ -43,6 +43,10 @@ type Config struct {
 	Base string
 	// Title is the name of the site.
 	Title string
+	// Heading is the homepage h1. Empty hides it.
+	Heading string
+	// Favicon is a local file to use instead of the icon in the posts folder.
+	Favicon string
 	// LiveReload rereads templates and tells an open browser when templates or
 	// stylesheets change. It is intended for the disk-backed development server.
 	LiveReload bool
@@ -58,6 +62,8 @@ type Site struct {
 	static     fs.FS
 	base       string
 	title      string
+	heading    string
+	favicon    favicon
 	liveReload bool
 
 	templatesMu     sync.RWMutex
@@ -74,6 +80,10 @@ func New(cfg Config) (*Site, error) {
 	media, err := src.Media()
 	if err != nil {
 		return nil, fmt.Errorf("read the pictures: %w", err)
+	}
+	icon, err := loadFavicon(src, cfg.Favicon)
+	if err != nil {
+		return nil, err
 	}
 	pages, err := buildPages(cfg.Templates)
 	if err != nil {
@@ -92,6 +102,8 @@ func New(cfg Config) (*Site, error) {
 		static:          cfg.Static,
 		base:            cleanBase(cfg.Base),
 		title:           cfg.Title,
+		heading:         cfg.Heading,
+		favicon:         icon,
 		liveReload:      cfg.LiveReload,
 		templateVersion: templateVersion,
 		templateSeen:    templateVersion,
@@ -120,8 +132,10 @@ type pageData struct {
 	// Color is the accent of the page being shown, if it asked for one.
 	Color string
 	// Site is the name of the whole site, for the tab and the wordmark.
-	Site string
-	Year int
+	Site    string
+	Heading string
+	Favicon string
+	Year    int
 }
 
 // buildPages joins each page to the layout in its own template set,
@@ -150,6 +164,9 @@ func (s *Site) routes() http.Handler {
 	mux.Handle("/static/", http.FileServer(http.FS(s.static)))
 	mux.Handle("/media/", http.StripPrefix("/media/",
 		http.FileServer(http.FS(s.media))))
+	if s.favicon.name != "" {
+		mux.HandleFunc("/"+s.favicon.name, s.favicon.serve)
+	}
 	if s.liveReload {
 		mux.HandleFunc("/__baumkuchen_reload", s.handleLiveReload)
 	}
@@ -241,6 +258,10 @@ func filesVersion(files fs.FS, pattern string) (string, error) {
 func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	data.Year = time.Now().Year()
 	data.Site = s.title
+	data.Heading = s.heading
+	if s.favicon.name != "" {
+		data.Favicon = "/" + s.favicon.name
+	}
 	s.reloadTemplates()
 	s.templatesMu.RLock()
 	t, ok := s.pages[name]
@@ -258,7 +279,12 @@ func (s *Site) render(w http.ResponseWriter, status int, name string, data pageD
 	var page bytes.Buffer
 	if err := s.renderTo(&page, name, data); err != nil {
 		log.Printf("render %s: %v", name, err)
-		http.Error(w, fmt.Sprintf("render %s: %v", name, err), http.StatusInternalServerError)
+		// the writer at the desk gets the error; anyone else gets no detail
+		msg := "internal server error"
+		if s.liveReload {
+			msg = fmt.Sprintf("render %s: %v", name, err)
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 	body := page.Bytes()

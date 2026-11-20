@@ -18,10 +18,11 @@
 {{end}}
 
 {{define "main"}}
+{{with .Heading}}
 <section class="intro">
-  <h1></h1>
-  <p></p>
+  <h1>{{.}}</h1>
 </section>
+{{end}}
 
 {{if .Pinned}}
 <ol class="feed pinned" role="list" aria-label="pages">

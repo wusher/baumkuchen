@@ -12,7 +12,7 @@ func TestLoadFile(t *testing.T) {
 	// arrange
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.yml")
-	body := "# a comment, and only two settings\ntitle: My Blog\nbase: /somewhere\n"
+	body := "# a comment\ntitle: My Blog\nheading: Read deeper\nfavicon: custom.png\nbase: /somewhere\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +29,9 @@ func TestLoadFile(t *testing.T) {
 	}
 	if cfg.Title != "My Blog" || cfg.Base != "/somewhere" {
 		t.Errorf("read %+v, want the title and the base from the file", cfg)
+	}
+	if cfg.Heading != "Read deeper" || cfg.Favicon != "custom.png" {
+		t.Errorf("read %+v, want the heading and favicon from the file", cfg)
 	}
 	if cfg.Posts != Defaults().Posts || cfg.Dist != Defaults().Dist || cfg.Addr != Defaults().Addr {
 		t.Errorf("read %+v, want the defaults for what the file leaves out", cfg)
@@ -90,7 +93,7 @@ func TestTitleReachesThePages(t *testing.T) {
 	dir := t.TempDir()
 	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
 	root := os.DirFS("../..")
-	site, err := New(Config{Posts: dir, Templates: root, Static: root, Title: "My Blog"})
+	site, err := New(Config{Posts: dir, Templates: root, Static: root, Title: "My Blog", Heading: "Read & explore"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,6 +115,12 @@ func TestTitleReachesThePages(t *testing.T) {
 	}
 	if !strings.Contains(index, ">My Blog</a>") {
 		t.Error("the wordmark must hold the site name")
+	}
+	if !strings.Contains(index, "<h1>Read &amp; explore</h1>") {
+		t.Error("the homepage must show the configured heading as text")
+	}
+	if !strings.Contains(post, "<h1>One</h1>") {
+		t.Error("a post heading must still show the post title")
 	}
 	if strings.Contains(index, "Four Depths") {
 		t.Error("the old name is still written into the page")

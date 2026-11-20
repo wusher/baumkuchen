@@ -143,6 +143,7 @@ writing inside. The tests in the repository do the same in Go.
 so the file can be short, or missing altogether.
 
     title: Four Depths     # the tab, and the wordmark
+    heading: Read deeper  # the homepage heading; omit to hide it
     posts: posts           # where the markdown is read from
     dist:  dist            # where the built site is written
     base:  /baumkuchen     # the folder it is published in; empty for the root
@@ -152,7 +153,14 @@ A flag beats the file, and only a flag you actually gave:
 
     go run . -addr :3000            # this once, on another port
     go run . -title "Something Else"
+    go run . -heading "Read deeper" -favicon ./my-icon.png
     go run . -config other.yml
+
+Put `favicon.svg` beside your Markdown posts to set the browser icon. To use a
+different SVG, PNG, or ICO file, pass `-favicon PATH` or set `favicon: PATH` in
+`baumkuchen.yml`. Relative override paths start in the working directory. The
+server and static export both use the same icon. If no icon is set and the
+posts folder has no `favicon.svg`, the built-in half-circle icon remains.
 
 A key that is not a setting stops the run and names itself, because a typo
 that is swallowed is a setting that quietly does nothing. The Makefile reads

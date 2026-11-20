@@ -50,6 +50,12 @@ func (s *Site) Export(dir string) (int, error) {
 		pageData{Title: "Not here"}); err != nil {
 		return n, err
 	}
+	if s.favicon.name != "" {
+		if err := os.WriteFile(filepath.Join(dir, s.favicon.name), s.favicon.data, 0o644); err != nil {
+			return n, err
+		}
+		n++
+	}
 	for _, p := range posts {
 		path := filepath.Join(dir, "post", p.Slug, "index.html")
 		if err := write(path, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color}); err != nil {

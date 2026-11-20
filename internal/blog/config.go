@@ -15,6 +15,10 @@ import (
 type File struct {
 	// Title is the name of the site, in the tab and beside every page name.
 	Title string `yaml:"title"`
+	// Heading is the homepage h1. Empty hides it.
+	Heading string `yaml:"heading"`
+	// Favicon overrides favicon.svg in the posts folder with a local file.
+	Favicon string `yaml:"favicon"`
 	// Posts is the folder the markdown is read from.
 	Posts string `yaml:"posts"`
 	// Dist is the folder the built site is written to.

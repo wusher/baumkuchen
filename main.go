@@ -68,6 +68,8 @@ func main() {
 	out := flag.String("export", "", "write the static site to this folder, then stop; \"-\" takes the folder in the settings")
 	base := flag.String("base", "", "the folder the built site is published in, as in /baumkuchen")
 	title := flag.String("title", "", "the name of the site")
+	heading := flag.String("heading", "", "the homepage heading; empty hides it")
+	favicon := flag.String("favicon", "", "a local SVG, PNG, or ICO file; otherwise use favicon.svg in the posts folder if present")
 	showVersion := flag.Bool("version", false, "print the version and stop")
 	open := flag.Bool("open", false, "open the browser once the server is up")
 	pack := flag.String("bundle", "", "write a copy of this program with the posts in this folder inside it, then stop")
@@ -112,6 +114,10 @@ func main() {
 			cfg.Base = *base
 		case "title":
 			cfg.Title = *title
+		case "heading":
+			cfg.Heading = *heading
+		case "favicon":
+			cfg.Favicon = *favicon
 		}
 	})
 
@@ -136,7 +142,8 @@ func main() {
 	}
 	site, err := blog.New(blog.Config{
 		Content: src, Templates: templateFiles, Static: staticFiles,
-		Base: cfg.Base, Title: cfg.Title, LiveReload: liveReload,
+		Base: cfg.Base, Title: cfg.Title, Heading: cfg.Heading, Favicon: cfg.Favicon,
+		LiveReload: liveReload,
 	})
 	if err != nil {
 		log.Fatal(err)

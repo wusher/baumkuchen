@@ -31,6 +31,9 @@ func loadFavicon(src content.Source, file string) (favicon, error) {
 		if err != nil {
 			return favicon{}, fmt.Errorf("read %s from %s: %w", defaultFavicon, src.Label(), err)
 		}
+		if !looksLike(".svg", data) {
+			return favicon{}, fmt.Errorf("%s in %s does not read as an SVG", defaultFavicon, src.Label())
+		}
 		return favicon{name: defaultFavicon, mediaType: "image/svg+xml", data: data}, nil
 	}
 
@@ -50,7 +53,30 @@ func loadFavicon(src content.Source, file string) (favicon, error) {
 	if err != nil {
 		return favicon{}, fmt.Errorf("read favicon: %w", err)
 	}
+	// The bytes must be the picture the name promises. The favicon is served
+	// and exported as it is, so a settings file that named some other kind of
+	// file would otherwise publish that file's contents under a picture's name.
+	if !looksLike(ext, data) {
+		return favicon{}, fmt.Errorf("favicon %q does not read as a %s file", file, strings.TrimPrefix(ext, "."))
+	}
 	return favicon{name: "favicon" + ext, mediaType: mediaType, data: data}, nil
+}
+
+// looksLike says whether the bytes begin the way the format begins.
+func looksLike(ext string, data []byte) bool {
+	switch ext {
+	case ".png":
+		return bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n"))
+	case ".ico":
+		return bytes.HasPrefix(data, []byte{0, 0, 1, 0})
+	case ".svg":
+		head := data
+		if len(head) > 512 {
+			head = head[:512]
+		}
+		return bytes.Contains(bytes.ToLower(head), []byte("<svg"))
+	}
+	return false
 }
 
 func (f favicon) serve(w http.ResponseWriter, r *http.Request) {

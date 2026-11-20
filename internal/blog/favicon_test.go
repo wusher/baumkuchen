@@ -78,3 +78,21 @@ func TestFaviconFallbackAndBadOverride(t *testing.T) {
 		t.Errorf("missing explicit favicon: got %v, want a missing-file error", err)
 	}
 }
+
+// A file whose bytes are not the picture its name promises is refused: the
+// favicon is published as it is, so a settings line must not be able to put
+// some other file's contents on the site under a picture's name.
+func TestFaviconRefusesBytesThatAreNotThePicture(t *testing.T) {
+	// arrange
+	posts := t.TempDir()
+	notAPng := write(t, t.TempDir(), "secret.png", "-----BEGIN OPENSSH PRIVATE KEY-----")
+	root := os.DirFS("../..")
+
+	// act
+	_, err := New(Config{Posts: posts, Templates: root, Static: root, Favicon: notAPng})
+
+	// assert
+	if err == nil || !strings.Contains(err.Error(), "does not read as a png") {
+		t.Errorf("got %v, want a refusal that names the format", err)
+	}
+}

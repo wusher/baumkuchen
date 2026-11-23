@@ -1,6 +1,6 @@
 # the built site is not kept: it is what a run makes, and the repository holds
-# the program that makes it. See `make export`, which empties the folder
-# first so a renamed post leaves no orphan behind.
+# the program that makes it. See `make export`, which clears the folder of the
+# last build first so a renamed post leaves no orphan behind.
 dist/
 
 # the compiled program: make build writes it

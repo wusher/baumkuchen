@@ -19,6 +19,9 @@ on:
       - 'static/**'
       - 'internal/**'
       - 'main.go'
+      - 'cli.go'
+      - 'commands.go'
+      - 'settings.go'
       - 'baumkuchen.yml'
       - 'go.mod'
       - 'go.sum'
@@ -46,7 +49,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
           cache: true
 
       # the folder the posts are read from is named here, because the one in
@@ -56,7 +59,7 @@ jobs:
         run: |
           base=$(awk '$1=="base:" {print $2}' baumkuchen.yml)
           echo "building the test blog for ${base:-the root of the site}"
-          go run . -posts test-blog -base "$base" -export public 2>&1 | tee build.log
+          go run . build test-blog --base "$base" --out public 2>&1 | tee build.log
 
       # a missing or empty build means the build did not run; say so here
       # rather than publishing an empty site

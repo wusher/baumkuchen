@@ -14,9 +14,11 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"sync"
 	"syscall"
@@ -50,6 +52,14 @@ type Config struct {
 	// LiveReload rereads templates and tells an open browser when templates or
 	// stylesheets change. It is intended for the disk-backed development server.
 	LiveReload bool
+	// HideDrafts holds the drafts back. They are off the index and their
+	// addresses give a 404, so a site on the network shows only what is
+	// finished. By default they are shown, marked as drafts, because a
+	// writer wants to read them as a reader would.
+	HideDrafts bool
+	// DevErrors shows a page that failed to render, with the error on it,
+	// rather than a log line and an empty page.
+	DevErrors bool
 }
 
 // Site is one blog: the posts it has read, and the pages it can write.
@@ -65,6 +75,8 @@ type Site struct {
 	heading    string
 	favicon    favicon
 	liveReload bool
+	hideDrafts bool
+	devErrors  bool
 
 	templatesMu     sync.RWMutex
 	templateVersion string
@@ -105,6 +117,8 @@ func New(cfg Config) (*Site, error) {
 		heading:         cfg.Heading,
 		favicon:         icon,
 		liveReload:      cfg.LiveReload,
+		hideDrafts:      cfg.HideDrafts,
+		devErrors:       cfg.DevErrors,
 		templateVersion: templateVersion,
 		templateSeen:    templateVersion,
 	}
@@ -161,9 +175,9 @@ func buildPages(files fs.FS) (map[string]*template.Template, error) {
 // the content, so a writer can add one without a build.
 func (s *Site) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.FileServer(http.FS(s.static)))
+	mux.Handle("/static/", filesOnly(s.static))
 	mux.Handle("/media/", http.StripPrefix("/media/",
-		http.FileServer(http.FS(s.media))))
+		filesOnly(s.media)))
 	if s.favicon.name != "" {
 		mux.HandleFunc("/"+s.favicon.name, s.favicon.serve)
 	}
@@ -178,8 +192,28 @@ func (s *Site) routes() http.Handler {
 // Serve answers on addr until it cannot, or until the program is told to
 // stop. Ctrl+C lets the requests in flight finish before the server goes.
 func (s *Site) Serve(addr string) error {
+	ln, err := s.Listen(addr)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return s.ServeOn(ln)
+}
+
+// Listen opens the socket and gives the listener back.
+//
+// The socket is opened before anything is served, so the address is known
+// before the site is announced: a port of 0 is a port the system picks, and
+// the site has to say which one it got.
+func (s *Site) Listen(addr string) (net.Listener, error) {
+	return net.Listen("tcp", addr)
+}
+
+// ServeOn answers on the listener until it cannot, or until the program is
+// told to stop. Ctrl+C lets the requests in flight finish before the server
+// goes.
+func (s *Site) ServeOn(ln net.Listener) error {
 	srv := &http.Server{
-		Addr:         addr,
 		Handler:      s.routes(),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -187,7 +221,7 @@ func (s *Site) Serve(addr string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	failed := make(chan error, 1)
-	go func() { failed <- srv.ListenAndServe() }()
+	go func() { failed <- srv.Serve(ln) }()
 	select {
 	case err := <-failed:
 		return err
@@ -200,6 +234,22 @@ func (s *Site) Serve(addr string) error {
 		}
 		return nil
 	}
+}
+
+// filesOnly serves the files, and never the folders.
+//
+// A file server will list a folder when it is asked for one. The pictures
+// and the stylesheet are not a place to browse, so a folder is a 404.
+func filesOnly(files fs.FS) http.Handler {
+	server := http.FileServer(http.FS(files))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if info, err := fs.Stat(files, name); err == nil && info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
+		server.ServeHTTP(w, r)
+	})
 }
 
 func (s *Site) reload() {
@@ -281,7 +331,7 @@ func (s *Site) render(w http.ResponseWriter, status int, name string, data pageD
 		log.Printf("render %s: %v", name, err)
 		// the writer at the desk gets the error; anyone else gets no detail
 		msg := "internal server error"
-		if s.liveReload {
+		if s.liveReload || s.devErrors {
 			msg = fmt.Sprintf("render %s: %v", name, err)
 		}
 		http.Error(w, msg, http.StatusInternalServerError)
@@ -343,13 +393,29 @@ const liveReloadScript = `<script>
 })();
 </script>`
 
+// visible gives the posts the index shows: all of them, drafts among them,
+// unless the drafts are held back.
+func (s *Site) visible() []*Post {
+	all := s.store.Index()
+	if !s.hideDrafts {
+		return all
+	}
+	out := make([]*Post, 0, len(all))
+	for _, p := range all {
+		if !p.Draft {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		s.notFound(w)
 		return
 	}
 	s.reload()
-	pinned, rest := splitPinned(s.store.Index())
+	pinned, rest := splitPinned(s.visible())
 	s.render(w, http.StatusOK, "index.html", pageData{
 		Title:  s.title,
 		Pinned: pinned,
@@ -362,6 +428,11 @@ func (s *Site) handlePost(w http.ResponseWriter, r *http.Request) {
 	slug := strings.Trim(strings.TrimPrefix(r.URL.Path, "/post/"), "/")
 	p, ok := s.store.Get(slug)
 	if !ok {
+		s.notFound(w)
+		return
+	}
+	if p.Draft && s.hideDrafts {
+		// a draft that is held back is not there, and says so
 		s.notFound(w)
 		return
 	}

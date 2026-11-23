@@ -96,6 +96,106 @@ func TestExportRefusesAPathItCannotMake(t *testing.T) {
 	}
 }
 
+// A picture in a folder of its own is copied with the folder it lives in.
+func TestExportCopiesPicturesInFolders(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	if err := os.MkdirAll(filepath.Join(dir, "images", "deeper"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "images", "deeper"), "pic.jpg", "not really a picture")
+	site := testSite(t, dir)
+	out := t.TempDir()
+
+	// act
+	if _, err := site.Export(out); err != nil {
+		t.Fatal(err)
+	}
+
+	// assert
+	if _, err := os.Stat(filepath.Join(out, "media", "deeper", "pic.jpg")); err != nil {
+		t.Errorf("the picture in the folder was not copied: %v", err)
+	}
+}
+
+// A build with the drafts in it keeps them.
+func TestExportWithDrafts(t *testing.T) {
+	// arrange
+	site, _ := siteWithPosts(t)
+	out := t.TempDir()
+
+	// act
+	if _, err := site.ExportWith(out, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// assert
+	if _, err := os.Stat(filepath.Join(out, "post", "hidden", "index.html")); err != nil {
+		t.Errorf("the draft did not reach the build: %v", err)
+	}
+}
+
+// The clean removes the files of an earlier build, and leaves the rest of the
+// folder alone.
+func TestCleanBuild(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	site, _ := siteWithPosts(t)
+	if _, err := site.Export(dir); err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "notes.txt", "a file of the writer's own")
+
+	// act
+	err := CleanBuild(dir)
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "index.html")); err == nil {
+		t.Error("the index of the earlier build is still there")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "notes.txt")); err != nil {
+		t.Error("the clean took a file that was not the build's")
+	}
+}
+
+// A folder that holds files but no index.html is not a build, and is not
+// emptied.
+func TestCleanBuildRefusesAFolderThatIsNotABuild(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	write(t, dir, "something.txt", "not a build")
+
+	// act
+	err := CleanBuild(dir)
+
+	// assert
+	if err == nil {
+		t.Fatal("the clean must refuse a folder that is not a build")
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "something.txt")); statErr != nil {
+		t.Error("the file was removed even though the clean refused")
+	}
+}
+
+// A folder that is not there has nothing to clean, and an empty one is
+// already clean.
+func TestCleanBuildOnAFolderThatIsNotThere(t *testing.T) {
+	// arrange
+	dir := filepath.Join(t.TempDir(), "no-such-folder")
+
+	// act + assert
+	if err := CleanBuild(dir); err != nil {
+		t.Errorf("a folder that is not there must not be a fault: %v", err)
+	}
+	if err := CleanBuild(t.TempDir()); err != nil {
+		t.Errorf("an empty folder must not be a fault: %v", err)
+	}
+}
+
 // The index draws its one line only when there are two groups to separate.
 func TestIndexRuleNeedsBothGroups(t *testing.T) {
 	// arrange

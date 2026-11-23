@@ -30,9 +30,41 @@ type File struct {
 	Addr string `yaml:"addr"`
 }
 
+// Set puts a value on a setting by its name.
+//
+// It is how a flag beats the file: the flag is named, and the setting it
+// names takes its value.
+func (f *File) Set(name, value string) {
+	switch name {
+	case "title":
+		f.Title = value
+	case "heading":
+		f.Heading = value
+	case "favicon":
+		f.Favicon = value
+	case "posts":
+		f.Posts = value
+	case "dist":
+		f.Dist = value
+	case "base":
+		f.Base = value
+	case "addr":
+		f.Addr = value
+	}
+}
+
 // Defaults are what a site holds before its settings file is read.
+//
+// The address is the loopback one: a server that answers only this machine
+// is the safe first answer, and a writer who wants it on the network says so.
 func Defaults() File {
-	return File{Title: "Four depths", Posts: "posts", Dist: "dist", Base: "", Addr: ":8080"}
+	return File{
+		Title: "Four Depths",
+		Posts: "posts",
+		Dist:  "dist",
+		Base:  "",
+		Addr:  "127.0.0.1:8080",
+	}
 }
 
 // LoadFile reads the settings, on top of the defaults. A file that is not
@@ -56,8 +88,13 @@ func LoadFile(path string) (File, bool, error) {
 // Load reads the settings from what is written, on top of the defaults. It is
 // how the settings inside the program are read: the same file, wherever it
 // came from.
+//
+// An empty file is a legal file: it says nothing, so the defaults stand.
 func Load(raw []byte) (File, error) {
 	file := Defaults()
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return file, nil
+	}
 	// UnmarshalStrict in spirit: an unknown key is a typo, and a typo that is
 	// swallowed is a setting that quietly does nothing.
 	dec := yaml.NewDecoder(bytes.NewReader(raw))

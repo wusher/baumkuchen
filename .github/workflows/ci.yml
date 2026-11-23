@@ -4,6 +4,9 @@
 # The posts live outside this repository, behind a link that only exists on
 # the machine that writes them, so the test that reads them skips here.
 # Everything else runs on posts made for the test.
+#
+# The Go version is the one go.mod asks for, so there is one place to change
+# it: the file itself.
 name: ci
 
 on:
@@ -23,7 +26,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: The format and the vet
@@ -31,6 +34,9 @@ jobs:
 
       - name: The tests
         run: make test
+
+      - name: The tests, and what they cover
+        run: make cover
 
       - name: The finished program
         run: make release

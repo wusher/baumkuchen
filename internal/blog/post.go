@@ -50,6 +50,9 @@ type Post struct {
 	// Depth is the one this post opens at, by its name in the markdown. It
 	// beats the depth the reader last chose, and the address beats it.
 	Depth string
+	// BadDate is the date in the front matter that could not be read. It is
+	// empty when there was no date, or when the one there was read.
+	BadDate string
 }
 
 // Lead gives the one sentence version. A post that does not carry that depth

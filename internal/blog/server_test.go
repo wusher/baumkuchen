@@ -93,6 +93,25 @@ func TestReloadFindsANewPost(t *testing.T) {
 	}
 }
 
+// A post that was already there is read again when it changes: the page shows
+// the writing as it is now, not the writing from when the server started.
+func TestReloadRereadsAChangedPost(t *testing.T) {
+	// arrange
+	site, dir := siteWithPosts(t)
+	rec := httptest.NewRecorder()
+
+	// act
+	write(t, dir, "open.md",
+		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# Open\n\n# Sentence\n\n"+
+			"A line written after the server started.\n")
+	site.handlePost(rec, httptest.NewRequest(http.MethodGet, "/post/open", nil))
+
+	// assert
+	if !strings.Contains(rec.Body.String(), "written after the server started") {
+		t.Errorf("the page does not hold the new writing: %s", rec.Body.String())
+	}
+}
+
 // The development server reads templates from disk after it starts, injects
 // the browser watcher, and changes the versions that watcher polls.
 func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
@@ -253,6 +272,59 @@ func TestPageCarriesTheColour(t *testing.T) {
 	if strings.Contains(index, "data-color") {
 		t.Error("the index must keep the site's own accent")
 	}
+}
+
+// The pictures and the stylesheet are not a place to browse: a folder gives a
+// 404, not a listing of what is in it.
+func TestFoldersAreNotListed(t *testing.T) {
+	// arrange
+	site, _ := siteWithPosts(t)
+	srv := httptest.NewServer(site.routes())
+	defer srv.Close()
+
+	// act
+	cases := []string{"/media/", "/static/"}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			res, err := http.Get(srv.URL + path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+
+			// assert
+			if res.StatusCode != http.StatusNotFound {
+				t.Errorf("%s gave %d, want %d", path, res.StatusCode, http.StatusNotFound)
+			}
+			if strings.Contains(string(body), "pic.jpg") ||
+				strings.Contains(string(body), "style.css") {
+				t.Errorf("%s lists what it holds: %s", path, body)
+			}
+		})
+	}
+}
+
+// A draft that is held back is not there, and says so.
+func TestHeldBackDraftsAreNotThere(t *testing.T) {
+	// arrange
+	site, dir := siteWithPosts(t)
+	site.hideDrafts = true
+	srv := httptest.NewServer(site.routes())
+	defer srv.Close()
+
+	// act
+	draft := get(t, srv.URL+"/post/hidden")
+	index := get(t, srv.URL+"/")
+
+	// assert
+	if strings.Contains(index, "Hidden") {
+		t.Error("a held back draft is on the index")
+	}
+	if strings.Contains(draft, "Hidden") {
+		t.Error("a held back draft has a page of its own")
+	}
+	_ = dir
 }
 
 func get(t *testing.T, url string) string {

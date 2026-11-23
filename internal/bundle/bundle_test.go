@@ -105,6 +105,100 @@ func TestWriteIsTheSameEveryTime(t *testing.T) {
 	}
 }
 
+// A bundle of a bundle carries one set of content, not two: the old one is
+// taken away before the new one goes in.
+func TestWriteStripsTheOldBundle(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	program := write(t, dir, "baumkuchen", "the program itself\n")
+	content := t.TempDir()
+	write(t, content, "one.md", "# One\n")
+	first := filepath.Join(dir, "first")
+	if _, err := Write(program, first, content); err != nil {
+		t.Fatal(err)
+	}
+
+	// act
+	second := filepath.Join(dir, "second")
+	if _, err := Write(first, second, content); err != nil {
+		t.Fatal(err)
+	}
+
+	// assert
+	firstInfo, err := os.Stat(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondInfo, err := os.Stat(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondInfo.Size() != firstInfo.Size() {
+		t.Errorf("the bundle of a bundle is %d bytes, want %d: the old bundle is still in it",
+			secondInfo.Size(), firstInfo.Size())
+	}
+	files, ok, err := Open(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("the bundle says it holds nothing")
+	}
+	data, err := fs.ReadFile(files, Root+"/one.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "# One\n" {
+		t.Errorf("the file came back as %q", data)
+	}
+}
+
+// The settings file is carried inside the bundle, and the one that was in the
+// content folder is not carried twice.
+func TestWriteWithTheSettings(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	program := write(t, dir, "baumkuchen", "the program itself\n")
+	content := t.TempDir()
+	write(t, content, "one.md", "# One\n")
+	write(t, content, "baumkuchen.yml", "title: The Old One\n")
+	out := filepath.Join(dir, "with-settings")
+
+	// act
+	n, err := WriteWith(program, out, content, map[string][]byte{
+		Root + "/baumkuchen.yml": []byte("title: The New One\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, ok, err := Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("the bundle says it holds nothing")
+	}
+
+	// assert
+	if n != 2 {
+		t.Errorf("%d file(s) went in, want 2", n)
+	}
+	data, err := fs.ReadFile(files, Root+"/baumkuchen.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "title: The New One\n" {
+		t.Errorf("the settings came back as %q", data)
+	}
+	names, err := fs.Glob(files, Root+"/baumkuchen.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 1 {
+		t.Errorf("the settings are in the bundle %d times, want once", len(names))
+	}
+}
+
 // A program with no content inside it says so, and that is not a fault.
 func TestOpenOnAPlainProgram(t *testing.T) {
 	// arrange

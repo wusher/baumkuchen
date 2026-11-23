@@ -291,7 +291,12 @@ func parsePost(src content.Source, file string) (*Post, error) {
 		Depth:  depthName(meta["depth"]),
 	}
 	if d, ok := meta["date"]; ok {
-		if t, err := time.Parse("2006-01-02", d); err == nil {
+		t, err := time.Parse("2006-01-02", d)
+		if err != nil {
+			// the date is there and cannot be read: the file time stands in
+			// for it, and the check names the date that was written
+			p.BadDate = d
+		} else {
 			p.Date = t
 		}
 	}

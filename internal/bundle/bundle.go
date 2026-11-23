@@ -37,15 +37,37 @@ const Root = "content"
 // same times on them, so the same program and the same content give the same
 // file twice.
 func Write(exe, out, dir string) (int, error) {
+	return WriteWith(exe, out, dir, nil)
+}
+
+// WriteWith copies the program at exe to out, with the content in dir inside
+// it, and the named files beside it.
+//
+// The content the program already carries is taken away first: a bundle of a
+// bundle would carry two of everything, and only the last one would be read.
+func WriteWith(exe, out, dir string, extra map[string][]byte) (int, error) {
 	program, err := os.ReadFile(exe)
 	if err != nil {
 		return 0, fmt.Errorf("read the program: %w", err)
 	}
+	program = StripBytes(program)
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	n, err := addContent(zw, dir)
+	n, err := addContent(zw, dir, extra)
 	if err != nil {
 		return 0, err
+	}
+	for _, name := range sortedNames(extra) {
+		head := &zip.FileHeader{Name: name, Method: zip.Deflate}
+		head.SetMode(0o644)
+		w, err := zw.CreateHeader(head)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := w.Write(extra[name]); err != nil {
+			return 0, err
+		}
+		n++
 	}
 	if err := zw.Close(); err != nil {
 		return 0, err
@@ -80,32 +102,85 @@ func Write(exe, out, dir string) (int, error) {
 	return n, nil
 }
 
+// sortedNames gives the names of the extra files in order, so the zip that
+// comes out is the same every time.
+func sortedNames(extra map[string][]byte) []string {
+	names := make([]string, 0, len(extra))
+	for name := range extra {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// Strip gives the program at path with the content it carries taken away.
+//
+// A program that carries nothing comes back as it is.
+func Strip(path string) ([]byte, error) {
+	whole, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return StripBytes(whole), nil
+}
+
+// StripBytes gives the program bytes with the content inside them taken away.
+func StripBytes(whole []byte) []byte {
+	if len(whole) < trailerSize {
+		return whole
+	}
+	mark := whole[len(whole)-trailerSize:]
+	if !bytes.Equal(mark[:len(magic)], magic[:]) {
+		return whole
+	}
+	zipLen := binary.LittleEndian.Uint64(mark[len(magic) : len(magic)+8])
+	total := binary.LittleEndian.Uint64(mark[len(magic)+8:])
+	if total != uint64(len(whole)) {
+		return whole
+	}
+	start := int64(len(whole)) - trailerSize - int64(zipLen)
+	if start < 0 {
+		return whole
+	}
+	return whole[:start]
+}
+
 // addContent puts every file of the folder into the zip.
-func addContent(zw *zip.Writer, dir string) (int, error) {
+//
+// A file that is also given beside the content is left out: the one given
+// beside it is the one that is wanted, and two files of one name in a zip is
+// a thing to read twice.
+func addContent(zw *zip.Writer, dir string, extra map[string][]byte) (int, error) {
 	files, err := walk(dir)
 	if err != nil {
 		return 0, err
 	}
+	n := 0
 	for _, file := range files {
 		rel, err := filepath.Rel(dir, file)
 		if err != nil {
-			return 0, err
+			return n, err
+		}
+		name := Root + "/" + filepath.ToSlash(rel)
+		if _, taken := extra[name]; taken {
+			continue
 		}
 		data, err := os.ReadFile(file)
 		if err != nil {
-			return 0, fmt.Errorf("read %s: %w", file, err)
+			return n, fmt.Errorf("read %s: %w", file, err)
 		}
-		head := &zip.FileHeader{Name: Root + "/" + filepath.ToSlash(rel), Method: zip.Deflate}
+		head := &zip.FileHeader{Name: name, Method: zip.Deflate}
 		head.SetMode(0o644)
 		w, err := zw.CreateHeader(head)
 		if err != nil {
-			return 0, err
+			return n, err
 		}
 		if _, err := w.Write(data); err != nil {
-			return 0, err
+			return n, err
 		}
+		n++
 	}
-	return len(files), nil
+	return n, nil
 }
 
 // walk gives every file in the folder, in order, with the hidden ones left

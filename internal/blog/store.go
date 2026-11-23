@@ -28,6 +28,20 @@ type Store struct {
 	incomplete []*Post
 	bySlug     map[string]*Post
 	stamp      string
+	// duplicates holds the slugs two files both want. The first one keeps
+	// the slug, and the other is named here rather than lost.
+	duplicates []Duplicate
+}
+
+// Duplicate is a slug that two files both want. They would answer at one
+// address, so the first one keeps it and the second is reported.
+type Duplicate struct {
+	// Slug is the address they both want.
+	Slug string
+	// First is the file that keeps it.
+	First string
+	// Second is the file that does not.
+	Second string
 }
 
 // NewStore reads the posts in the folder at dir.
@@ -94,6 +108,7 @@ func (s *Store) Refresh() error {
 		return err
 	}
 	var posts, incomplete []*Post
+	var duplicates []Duplicate
 	bySlug := map[string]*Post{}
 	for _, file := range paths {
 		p, err := parsePost(s.src, file)
@@ -107,6 +122,7 @@ func (s *Store) Refresh() error {
 			// two files of the same name in different folders would answer at
 			// one URL; the first one keeps it, and the other is named here
 			log.Printf("two files want /post/%s: %s and %s", p.Slug, first.File, p.File)
+			duplicates = append(duplicates, Duplicate{Slug: p.Slug, First: first.File, Second: p.File})
 			continue
 		}
 		if p.Published {
@@ -124,8 +140,16 @@ func (s *Store) Refresh() error {
 
 	s.mu.Lock()
 	s.posts, s.incomplete, s.bySlug, s.stamp = posts, incomplete, bySlug, fp
+	s.duplicates = duplicates
 	s.mu.Unlock()
 	return nil
+}
+
+// Duplicates gives the slugs two files both want, so the check can say so.
+func (s *Store) Duplicates() []Duplicate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.duplicates
 }
 
 // Index gives what the running server shows: every post that carries a depth,

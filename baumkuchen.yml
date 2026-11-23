@@ -1,11 +1,17 @@
 # The settings for this site. Every one of them has a working default, so this
 # file can be short, or missing altogether. A flag beats what is written here:
 #
-#   make run                     # the address below
-#   go run . -addr :3000         # this once, on another port
+#   make run                                 # the address below
+#   go run . serve --addr 127.0.0.1:3000     # this once, on another port
 
 # the name of the site, in the tab and as the wordmark
 title: Four Depths
+
+# the line under the wordmark
+heading:
+
+# the picture the browser shows on the tab
+favicon:
 
 # the folder the markdown is read from. It is a symlink here: the posts live
 # outside this repository. See `make link`.
@@ -18,5 +24,7 @@ dist: dist
 # from /the-repo/; leave this empty for a custom domain or a user site.
 base: /baumkuchen
 
-# where the server listens
-addr: :8080
+# where the server listens. The loopback address is the safe first answer: it
+# is the one only this machine can reach, so the drafts are shown. The
+# program answers on any other address with the drafts held back.
+addr: 127.0.0.1:8080

@@ -50,12 +50,12 @@ The real posts live outside this repository, behind the posts link. This folder
 is a second, separate set, so it is named on the command line:
 
     make release
-    ./build/baumkuchen -posts test-blog -addr 127.0.0.1:8080
+    ./build/baumkuchen serve test-blog --addr 127.0.0.1:8080
 
 The live site then answers on http://127.0.0.1:8080 with these ten articles
 and the three pages above them. The static build works the same way:
 
-    ./build/baumkuchen -posts test-blog -export out
+    ./build/baumkuchen build test-blog --out out
 
 The audit reads this folder as well, and it is the one that decides whether
 the writing holds to the rules of the site:

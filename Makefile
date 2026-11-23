@@ -24,7 +24,7 @@ COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u -d "@$${SOURCE_DATE_EPOCH:-$$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: help setup link build release install releases bundle run lint check test cover clean new audit export stats smoke
+.PHONY: help setup link build release install releases bundle run lint check test cover clean new audit stats smoke export verify
 
 help: ## Show the targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*## /|/' | awk -F'|' '{printf "  %-7s %s\n", $$1, $$2}'
@@ -40,7 +40,7 @@ build: ## Compile the server into ./$(BINARY)
 release: ## The finished program, with its name in it, into ./$(BUILD)
 	@mkdir -p $(BUILD)
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
-	@$(BUILD)/$(BINARY) -version
+	@$(BUILD)/$(BINARY) version
 
 install: release ## Install the finished program into $(PREFIX)/bin
 	install -d "$(DESTDIR)$(PREFIX)/bin"
@@ -61,11 +61,11 @@ bundle: ## One file with the program and the posts inside it (CONTENT=folder)
 	@test -n "$(CONTENT)" || { echo "bundle: name the folder with the posts: make bundle CONTENT=~/blog"; exit 1; }
 	@mkdir -p $(BUILD)
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
-	$(BUILD)/$(BINARY) -bundle $(CONTENT) -o $(BUILD)/$(BINARY)-bundle
+	$(BUILD)/$(BINARY) bundle $(CONTENT) -o $(BUILD)/$(BINARY)-bundle
 	@echo "$(BUILD)/$(BINARY)-bundle holds the program and the posts from $(CONTENT)"
 
 run: ## Start the server, on the address in $(CONFIG)
-	go run .
+	go run . serve --config $(CONFIG)
 
 lint: ## Repair the format, then report what is left
 	gofmt -w -s .
@@ -86,15 +86,19 @@ cover: ## Run the tests and report what they cover
 	@go test ./... -coverprofile=.cover.out >/dev/null
 	@printf 'the package  '; go test ./internal/... -coverprofile=.pkg.out 2>/dev/null | tail -1
 	@printf 'everything   '; go tool cover -func=.cover.out | tail -1
-	@echo "(everything counts main.go, which is flags and wiring, and has no test)"
+	@echo "(the package count covers the site, the content and the bundle;"
+	@echo " the whole count adds main.go, which is the command line and the"
+	@echo " commands, and holds their tests)"
 	@echo "for the lines themselves: go test ./... -coverprofile=.cover.out && go tool cover -html=.cover.out"
 	@rm -f .cover.out .pkg.out
 
 export: ## Build the static site into ./$(DIST), with no draft in it
 	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
-		echo "export: refusing to empty '$(DIST)'"; exit 1;; esac
-	rm -rf $(DIST)
-	go run . -export $(DIST)
+		echo "export: refusing to clean '$(DIST)'"; exit 1;; esac
+	go run . build --config $(CONFIG) --out $(DIST) --clean
+
+verify: ## Say what is wrong with the posts, and stop on an error
+	go run . check --config $(CONFIG) --strict
 
 link: ## Point ./posts at the folder where the posts live
 	@POSTS=$(POSTS) scripts/link-posts.sh $(TO)

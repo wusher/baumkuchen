@@ -176,6 +176,12 @@ footer.site p { margin: 0; color: var(--muted); font: 400 .85rem/1.5 var(--sans)
   text-decoration: none; color: var(--ink);
 }
 .wordmark:hover { color: var(--accent); }
+/* the strapline under the wordmark: the site's own line, under its own name.
+   It keeps its own case and its own weight: it is a sentence, not a mark. */
+.wordmark .heading {
+  display: block; font-weight: 400; font-size: .78rem; letter-spacing: .02em;
+  text-transform: none; color: var(--muted);
+}
 
 .theme {
   display: inline-flex; align-items: center; gap: .48rem; min-height: var(--row);

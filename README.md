@@ -15,7 +15,7 @@ the writer keeps it. The program is told where it is.
 
     make setup                                        # the Go modules, and the link to the writing
     make release                                      # ./build/baumkuchen, with its name in it
-    ./build/baumkuchen -posts ~/blog -export out     # the static site, written into out/
+    ./build/baumkuchen build ~/blog -o out             # the static site, written into out/
 
 Those three lines are the whole of it: one program that reads a folder of
 markdown and writes a site of plain files. The files go to any static host.
@@ -25,16 +25,43 @@ The same program can serve the site while you write.
 folder yet, and stops with the line to type when there is nobody there to ask.
 `scripts/link-posts.sh ~/blog` makes the link without a question.
 
+## The commands
+
+The program has a command for each thing it does. The command comes first; the
+folder and the flags may come in any order after it.
+
+    baumkuchen serve ~/blog          # the live site, on the loopback address
+    baumkuchen build ~/blog -o out   # the static site, written into out/
+    baumkuchen check ~/blog          # what is wrong with the writing
+    baumkuchen check --json ~/blog   # the same report, as JSON
+    baumkuchen bundle ~/blog -o one  # one file with the program and the writing in it
+    baumkuchen init my-blog          # the settings file for a new site
+    baumkuchen version               # which build this is
+
+`serve` is the one that stands in for the others: `baumkuchen ~/blog` and
+`baumkuchen serve ~/blog` are the same command.
+
+Every command understands `--config FILE`, `--quiet`, `--verbose` and
+`--help`. Each command has flags of its own, and `baumkuchen <command> --help`
+lists them.
+
+**The codes.** 0 when all went well, 1 when something went wrong, and 2 when
+the command line itself was wrong. A flag that is gone says what to write
+instead, and leaves with 2:
+
+    $ baumkuchen -export out
+    baumkuchen: -export is gone: use baumkuchen build -o DIR
+
 ## The two ways to run it
 
 **The static site.** The build writes the whole site as plain files and stops.
 
-    ./build/baumkuchen -posts ~/blog -export out
+    ./build/baumkuchen build ~/blog -o out
 
 **The live site.** The server answers on an address and rereads the writing
 when a file changes, so you can edit a post and refresh the page.
 
-    ./build/baumkuchen -posts ~/blog -addr 127.0.0.1:8080
+    ./build/baumkuchen serve ~/blog --addr 127.0.0.1:8080
 
 Both work the same whether the writing is in a folder or inside the program.
 
@@ -44,22 +71,22 @@ The first one that is given wins: the folder named on the command line, then
 the environment, then the `posts:` line in the settings file.
 
     ./build/baumkuchen ~/blog                    # a folder, as an argument
-    ./build/baumkuchen -posts ~/blog            # the same, as a flag
     BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen  # the same, from the environment
-    ./build/baumkuchen -posts ~/blog -config my.yml   # with other settings
+    ./build/baumkuchen --config my.yml ~/blog   # with other settings
 
-Name one folder only, either as the argument or with `-posts`, not both. The
-flags go before the folder when it is given as an argument, so
-`baumkuchen -export out ~/blog` is the way to say it. A folder that is not
-there is reported by name, rather than quietly giving an empty site.
+Name one folder only, as the argument. A folder that is not there is reported
+by name, rather than quietly giving an empty site. A folder whose name is the
+name of a command — `build`, `check`, `serve` — is written with a path in front
+of it, as in `./build`, so that there is never a doubt about what it is.
 
 ### One file with the writing inside
 
 A copy of the program with the writing in it is made on purpose, by naming the
 folder to put in. Nothing is ever put inside a program by accident.
 
-    make bundle CONTENT=~/blog          # ./build/baumkuchen-bundle
-    ./build/baumkuchen-bundle -export out
+    make bundle CONTENT=~/blog               # ./build/baumkuchen-bundle
+    ./build/baumkuchen bundle ~/blog -o one  # the same, without the Makefile
+    ./build/baumkuchen-bundle build -o out   # the site, from the one file
 
 That one file builds the site and serves it, with nothing else on the machine:
 the writing, the templates, the stylesheet and the settings are all in it.
@@ -67,7 +94,7 @@ the writing, the templates, the stylesheet and the settings are all in it.
 ## Install
 
     make install                       # ~/.local/bin/baumkuchen
-    baumkuchen -posts ~/blog
+    baumkuchen ~/blog
 
 Make sure `~/.local/bin` is on your `PATH`. Only the program is installed; the
 writing stays in the folder you choose. Override `PREFIX` for another
@@ -85,7 +112,7 @@ location, or use `DESTDIR` to stage an installation for packaging:
 `make release` writes the name of the build into the program, so a copy can
 say which one it is:
 
-    ./build/baumkuchen -version
+    ./build/baumkuchen version
     baumkuchen v1.2.3 (a1b2c3d, 2026-09-01T10:00:00Z)
 
 The build is the same every time, given the same source and the same tool
@@ -108,6 +135,7 @@ writing inside. The tests in the repository do the same in Go.
     make audit     # what is written, and what is wrong with it
     make stats     # the same table, with the numbers only
     make export    # the static site, into the folder in the settings
+    make verify    # what is wrong with the writing, and stop on an error
     make lint      # repair the format, then report what is left
     make check     # the format and the vet; changes no file
     make test      # the tests
@@ -128,20 +156,28 @@ writing inside. The tests in the repository do the same in Go.
 so the file can be short, or missing altogether.
 
     title: Four Depths     # the tab, and the wordmark
+    heading:               # the line under the wordmark
+    favicon:               # the picture on the tab
     posts: posts           # where the markdown is read from
     dist:  dist            # where the built site is written
     base:  /baumkuchen     # the folder it is published in; empty for the root
-    addr:  :8080           # where the server listens
+    addr:  127.0.0.1:8080  # where the server listens
 
 A flag beats the file, and only a flag you actually gave:
 
-    go run . -addr :3000            # this once, on another port
-    go run . -title "Something Else"
-    go run . -config other.yml
+    go run . serve --addr :3000            # this once, on another port
+    go run . build --title "Something Else"
+    go run . --config other.yml
 
 A key that is not a setting stops the run and names itself, because a typo
 that is swallowed is a setting that quietly does nothing. The Makefile reads
 the folders out of the same file, so there is one place to change them.
+
+The settings file is looked for in this order: the one named with `--config`,
+then the one in the folder named on the command line, then the one in the
+working folder, then the one inside a program that carries its writing. A file
+that is named and is not there is a mistake, and is reported as one. A file
+that is not named and is not there is not a mistake at all: the defaults stand.
 
 ## Where the writing lives
 
@@ -154,7 +190,7 @@ per machine: `make setup` asks where the writing lives and makes it, or
 `scripts/link-posts.sh ~/blog` makes it without a question. The link is
 followed once, when the folder is opened, so every path inside is a real one.
 A program that was copied somewhere else reads the same writing from the
-folder you name with `-posts`.
+folder you name on the command line.
 
 Two folders are stepped over: `images/`, which holds the pictures, and anything
 whose name starts with a dot.
@@ -162,7 +198,7 @@ whose name starts with a dot.
 **A folder whose name starts with `_` holds its files back.** Everything under
 `_drafts/` is a draft, whatever its own front matter says — the folder is you
 saying "not yet". Such a file is on the index and readable while the server
-runs, marked as a draft, and never in the built site.
+runs on the loopback address, marked as a draft, and never in the built site.
 
 Two files with the same name in different folders would answer at one URL. The
 first one in the walk keeps it, and the startup log names both, so the clash is
@@ -264,10 +300,12 @@ post that does not carry the chosen depth opens at the nearest one it has,
 and leaves the choice alone; only moving the slider sets a new one.
 
 The server rereads the writing when a file changes, so you can edit a post and
-refresh the page. When it runs from the project folder, it also live reloads
-`templates/*.html` and `static/*.css`: template edits refresh the browser and
-stylesheet edits appear without a page refresh. Static exports still use the
-files embedded in the binary.
+refresh the page. With `--dev` it reads the templates and the stylesheet from
+disk as well, and live reloads them: a template edit refreshes the browser and
+a stylesheet edit appears without a page refresh. The program must then be run
+from the project folder, where the templates are. Without `--dev` the
+templates and the stylesheet come from inside the program, and the build uses
+those too.
 
 ## draft and pinned
 
@@ -286,7 +324,11 @@ Two front matter properties change where a file goes.
 
 **draft** — the post is on the index and at its own URL while the server is
 up, with a **draft** mark beside it, so you read it as a reader would. The
-build leaves it out: no page, and no line on the index.
+build leaves it out: no page, and no line on the index. The server shows the
+drafts only while it answers the loopback address, where only this machine can
+reach it. On any other address they are held back and their addresses give a
+404, so a site on the network shows only what is finished. `--drafts` and
+`--no-drafts` say which way it goes, either way.
 
 **pinned** — the page sits above every post on the index, whatever its date,
 and it drops the furniture of a post: no tag, no date, no depth count. It shows
@@ -327,7 +369,7 @@ whole palette is the block under `the named colours` in `static/style.css`.
 
     make export             # into ./dist, from the folder in the settings
     make export DIST=out    # somewhere else
-    ./build/baumkuchen -posts ~/blog -export out    # from any folder
+    ./build/baumkuchen build ~/blog -o out    # from any folder
 
 It writes the URLs the server already answers on, so nothing changes when you
 deploy:
@@ -338,13 +380,16 @@ deploy:
     dist/static/style.css   app.js
     dist/media/*
 
-A draft never reaches it, and neither does a file with no depth. `make export`
-empties the folder first, so a post you renamed leaves no page behind; the Go
-code itself deletes nothing, and the `rm` sits on the line that does it.
+A draft never reaches it, and neither does a file with no depth, unless
+`--drafts` is given. `make export` clears the folder of the last build first,
+so a post you renamed leaves no page behind; the clearing is done by `--clean`,
+which removes only what a build wrote — `index.html`, `404.html`, `post/`,
+`static/` and `media/` — and refuses a folder that holds files but no
+`index.html`, because that is not a build.
 
 The finished program does the same build, without the repository:
 
-    ./build/baumkuchen -posts ~/blog -export out
+    ./build/baumkuchen build ~/blog -o out
 
 The built site is not kept in the repository. It is what a run makes, and the
 repository holds the program that makes it.
@@ -360,7 +405,7 @@ setting is one line in `baumkuchen.yml`:
 
 A flag beats the file:
 
-    ./build/baumkuchen -posts ~/blog -base /blog -export out
+    ./build/baumkuchen build ~/blog --base /blog -o out
 
 Leave `base` empty for a custom domain or a user site, both of which are
 served from the root. Only `href="/…"` and `src="/…"` are touched, so an
@@ -434,6 +479,33 @@ footnote link still works.
 Only the depth on screen is in the page for a reader view or a clipper: the
 others carry `aria-hidden` and `inert`, which is what those tools read. A
 clipping holds one depth, not five.
+
+## The check
+
+`baumkuchen check` says what is wrong with the writing, and how much of it is
+right. It is the same report as text and as JSON.
+
+    baumkuchen check ~/blog              # the report, as text
+    baumkuchen check --json ~/blog       # the same report, as JSON
+    baumkuchen check --strict ~/blog     # stop with 1 on a warning as well
+    make verify                          # the same, on the writing in the settings
+
+The text report holds the counts of the site and then every finding:
+
+    12 published post(s), 1 draft(s), 0 without a depth
+    warning: no depth for: Paragraph, Short, Medium, Long
+    0 error(s), 1 warning(s)
+
+The JSON holds the same counts and the same findings, so a script can read
+them:
+
+    $ baumkuchen check --json ~/blog | jq .published
+    12
+
+It leaves with 1 when the writing holds an error, and 0 when it does not. With
+`--strict` a warning is an error as well. The report goes to the standard
+output and the log to the standard error, so a pipe gets the report and
+nothing else.
 
 ## The audit
 
@@ -530,7 +602,10 @@ Two switches change that:
 
 ## The files
 
-    main.go     the command: the flags, the settings, the two ways to run
+    main.go     the program: the embedded templates, the stylesheet, the exit codes
+    cli.go      the command line: the commands, the flags, the help
+    commands.go what each command does
+    settings.go where the settings come from, and what they are
     internal/blog/  the site: the posts, the pages, the build, the server
     internal/content/  where the writing comes from: a folder, or files in the program
     internal/bundle/   putting the writing inside a copy of the program
@@ -553,14 +628,21 @@ depths and each with its own pictures, and three pages — `about.md`,
 at the top of the index. `test-blog/NOTES.txt` says more about the folder.
 They are read like any other folder of writing:
 
-    ./build/baumkuchen -posts test-blog -addr 127.0.0.1:8080
+    ./build/baumkuchen serve test-blog --addr 127.0.0.1:8080
     POSTS=test-blog IMAGES=test-blog/images scripts/audit.sh
 
 ## The checks
 
     make check   # the format and the vet; changes no file
     make test    # the tests
+    make cover   # the tests, and what they cover
     make lint    # repair the format, then report what is left
+    make verify  # what is wrong with the writing, and stop on an error
     make smoke   # the finished program, out of the repository, doing its work
 
-The same checks run on every push, in `.github/workflows/ci.yml`.
+The same checks run on every push, in `.github/workflows/ci.yml`. The smoke
+test is the one that proves the program stands on its own: it builds the site
+in a working folder that holds nothing else, serves it, changes a post and
+sees the change, shows a draft on the loopback address and holds it back on
+another, reads the count of the posts with `jq`, and does the same with a copy
+that has the writing inside it.

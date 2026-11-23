@@ -24,7 +24,16 @@ import (
 // separate, deliberate step.
 // Export writes the whole site into dir as plain files.
 func (s *Site) Export(dir string) (int, error) {
+	return s.ExportWith(dir, false)
+}
+
+// ExportWith writes the whole site into dir as plain files, with the drafts
+// in it when drafts is true.
+func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 	posts := s.store.Published()
+	if drafts {
+		posts = s.store.Index()
+	}
 	n := 0
 
 	write := func(path, name string, data pageData) error {
@@ -85,38 +94,83 @@ func (s *Site) Export(dir string) (int, error) {
 		return n, err
 	}
 
-	// the pictures, which live beside the posts and are served at /media/
-	entries, err := fs.ReadDir(s.media, ".")
+	// the pictures, which live beside the posts and are served at /media/.
+	// The folder inside the images folder is walked too, so a picture in a
+	// folder of its own is copied with the folder it lives in.
+	var pictures int
+	var before, after int64
+	err = fs.WalkDir(s.media, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || strings.HasPrefix(d.Name(), ".") {
+			return nil
+		}
+		data, err := fs.ReadFile(s.media, name)
+		if err != nil {
+			return err
+		}
+		src, dst, err := optimizeImageBytes(data, filepath.Join(dir, "media", filepath.FromSlash(name)))
+		if err != nil {
+			return err
+		}
+		before += src
+		after += dst
+		pictures++
+		n++
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return n, nil // a site with no picture is not an error
 		}
 		return n, err
 	}
-	var pictures int
-	var before, after int64
-	for _, e := range entries {
-		if e.IsDir() || strings.HasPrefix(e.Name(), ".") {
-			continue
-		}
-		data, err := fs.ReadFile(s.media, e.Name())
-		if err != nil {
-			return n, err
-		}
-		src, dst, err := optimizeImageBytes(data, filepath.Join(dir, "media", e.Name()))
-		if err != nil {
-			return n, err
-		}
-		before += src
-		after += dst
-		pictures++
-		n++
-	}
 	if before > 0 {
 		log.Printf("%d picture(s), %d KB written of %d KB, %d%% saved",
 			pictures, after/1024, before/1024, 100-after*100/before)
 	}
 	return n, nil
+}
+
+// CleanBuild removes the files an earlier build wrote into dir, and leaves
+// everything else where it is.
+//
+// A folder that holds files but no index.html is not a build, and is
+// refused rather than emptied: a writer who points the build at the wrong
+// folder keeps everything in it.
+func CleanBuild(dir string) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a folder", dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, "index.html")); err != nil {
+		return fmt.Errorf("%s holds files but no index.html: it is not a build, so nothing was removed", dir)
+	}
+	for _, name := range []string{"index.html", "404.html"} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	for _, name := range []string{"post", "static", "media"} {
+		if err := os.RemoveAll(filepath.Join(dir, name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Every link the site writes starts at the root, because that is where the

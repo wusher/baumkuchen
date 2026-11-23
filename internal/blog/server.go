@@ -8,11 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -38,9 +41,21 @@ type Config struct {
 	Base string
 	// Title is the name of the site.
 	Title string
+	// Heading is the line under the wordmark.
+	Heading string
+	// Favicon is the picture the browser shows on the tab.
+	Favicon string
 	// LiveReload rereads templates and tells an open browser when templates or
 	// stylesheets change. It is intended for the disk-backed development server.
 	LiveReload bool
+	// HideDrafts holds the drafts back. They are off the index and their
+	// addresses give a 404, so a site on the network shows only what is
+	// finished. By default they are shown, marked as drafts, because a
+	// writer wants to read them as a reader would.
+	HideDrafts bool
+	// DevErrors shows a page that failed to render, with the error on it,
+	// rather than a log line and an empty page.
+	DevErrors bool
 }
 
 // Site is one blog: the posts it has read, and the pages it can write.
@@ -53,7 +68,11 @@ type Site struct {
 	static     fs.FS
 	base       string
 	title      string
+	heading    string
+	favicon    string
 	liveReload bool
+	hideDrafts bool
+	devErrors  bool
 
 	templatesMu     sync.RWMutex
 	templateVersion string
@@ -87,7 +106,11 @@ func New(cfg Config) (*Site, error) {
 		static:          cfg.Static,
 		base:            cleanBase(cfg.Base),
 		title:           cfg.Title,
+		heading:         cfg.Heading,
+		favicon:         cfg.Favicon,
 		liveReload:      cfg.LiveReload,
+		hideDrafts:      cfg.HideDrafts,
+		devErrors:       cfg.DevErrors,
 		templateVersion: templateVersion,
 		templateSeen:    templateVersion,
 	}
@@ -116,7 +139,11 @@ type pageData struct {
 	Color string
 	// Site is the name of the whole site, for the tab and the wordmark.
 	Site string
-	Year int
+	// Heading is the line under the wordmark.
+	Heading string
+	// Favicon is the picture the browser shows on the tab.
+	Favicon string
+	Year    int
 }
 
 // buildPages joins each page to the layout in its own template set,
@@ -142,9 +169,9 @@ func buildPages(files fs.FS) (map[string]*template.Template, error) {
 // the content, so a writer can add one without a build.
 func (s *Site) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.FileServer(http.FS(s.static)))
+	mux.Handle("/static/", filesOnly(s.static))
 	mux.Handle("/media/", http.StripPrefix("/media/",
-		http.FileServer(http.FS(s.media))))
+		filesOnly(s.media)))
 	if s.liveReload {
 		mux.HandleFunc("/__baumkuchen_reload", s.handleLiveReload)
 	}
@@ -153,15 +180,49 @@ func (s *Site) routes() http.Handler {
 	return mux
 }
 
-// Serve answers on addr until it cannot.
-func (s *Site) Serve(addr string) error {
+// filesOnly serves the files, and never the folders.
+//
+// A file server will list a folder when it is asked for one. The pictures
+// and the stylesheet are not a place to browse, so a folder is a 404.
+func filesOnly(files fs.FS) http.Handler {
+	server := http.FileServer(http.FS(files))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if info, err := fs.Stat(files, name); err == nil && info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
+		server.ServeHTTP(w, r)
+	})
+}
+
+// Listen opens the socket and gives the listener back.
+//
+// The socket is opened before anything is served, so the address is known
+// before the site is announced: a port of 0 is a port the system picks, and
+// the site has to say which one it got.
+func (s *Site) Listen(addr string) (net.Listener, error) {
+	return net.Listen("tcp", addr)
+}
+
+// ServeOn answers on the listener until it cannot.
+func (s *Site) ServeOn(ln net.Listener) error {
 	srv := &http.Server{
-		Addr:         addr,
 		Handler:      s.routes(),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-	return srv.ListenAndServe()
+	return srv.Serve(ln)
+}
+
+// Serve answers on addr until it cannot.
+func (s *Site) Serve(addr string) error {
+	ln, err := s.Listen(addr)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return s.ServeOn(ln)
 }
 
 func (s *Site) reload() {
@@ -220,6 +281,8 @@ func filesVersion(files fs.FS, pattern string) (string, error) {
 func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	data.Year = time.Now().Year()
 	data.Site = s.title
+	data.Heading = s.heading
+	data.Favicon = s.favicon
 	s.reloadTemplates()
 	s.templatesMu.RLock()
 	t, ok := s.pages[name]
@@ -234,7 +297,7 @@ func (s *Site) render(w http.ResponseWriter, name string, data pageData) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	var page bytes.Buffer
 	if err := s.renderTo(&page, name, data); err != nil {
-		log.Printf("render %s: %v", name, err)
+		s.renderError(w, name, err)
 		return
 	}
 	body := page.Bytes()
@@ -242,6 +305,21 @@ func (s *Site) render(w http.ResponseWriter, name string, data pageData) {
 		body = bytes.Replace(body, []byte("</body>"), []byte(liveReloadScript+"</body>"), 1)
 	}
 	_, _ = w.Write(body)
+}
+
+// renderError says that a page did not come out.
+//
+// In development the error is on the page, in full: a writer is looking at
+// the browser and wants to know what went wrong. Otherwise it goes in the
+// log, and the reader gets nothing but an empty page.
+func (s *Site) renderError(w http.ResponseWriter, name string, err error) {
+	log.Printf("render %s: %v", name, err)
+	if !s.devErrors {
+		return
+	}
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, "<!doctype html><meta charset=\"utf-8\"><title>%s</title><pre>%s</pre>",
+		html.EscapeString(name), html.EscapeString(err.Error()))
 }
 
 func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {
@@ -293,7 +371,7 @@ func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.reload()
-	pinned, rest := splitPinned(s.store.Index())
+	pinned, rest := splitPinned(s.visible())
 	s.render(w, "index.html", pageData{
 		Title:  s.title,
 		Pinned: pinned,
@@ -309,7 +387,28 @@ func (s *Site) handlePost(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w)
 		return
 	}
+	if p.Draft && s.hideDrafts {
+		// a draft that is held back is not there, and says so
+		s.notFound(w)
+		return
+	}
 	s.render(w, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color})
+}
+
+// visible gives the posts the index shows: the drafts are left out when the
+// site holds them back.
+func (s *Site) visible() []*Post {
+	all := s.store.Index()
+	if !s.hideDrafts {
+		return all
+	}
+	out := make([]*Post, 0, len(all))
+	for _, p := range all {
+		if !p.Draft {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func (s *Site) notFound(w http.ResponseWriter) {

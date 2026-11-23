@@ -66,7 +66,7 @@ bundle: ## One file with the program and the posts inside it (CONTENT=folder)
 	@echo "$(BUILD)/$(BINARY)-bundle holds the program and the posts from $(CONTENT)"
 
 run: ## Start the server, on the address in $(CONFIG)
-	go run . serve --config $(CONFIG)
+	go run . serve --config $(CONFIG) --dev
 
 lint: ## Repair the format, then report what is left
 	gofmt -w -s .
@@ -93,8 +93,6 @@ cover: ## Run the tests and report what they cover
 	@echo "for the lines themselves: go test ./... -coverprofile=.cover.out && go tool cover -html=.cover.out"
 	@rm -f .cover.out .pkg.out
 
-export: ## Build the static site into ./$(DIST), with no draft in it
-	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
 export: ## Build the static site into ./$(DIST), with no draft in it
 	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
 		echo "export: refusing to clean '$(DIST)'"; exit 1;; esac

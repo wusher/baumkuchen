@@ -4,9 +4,9 @@ A static site generator for a blog that carries the same idea at up to five
 lengths: one sentence, one paragraph, three paragraphs, a page, three pages.
 The reader moves between the lengths a post has, with a slider.
 
-The program is one file. The templates, the stylesheet, the script and the
-settings are built into it, so a copy of it runs anywhere: it needs the folder
-it was made in for nothing at all.
+The program is one file. The templates, the stylesheet and the script are
+built into it, so a copy of it runs anywhere: it needs the folder it was made
+in for nothing at all.
 
 The writing is not built into it. The writing is the work, and it stays where
 the writer keeps it. The program is told where it is.
@@ -201,6 +201,12 @@ working folder, then the one inside a program that carries its writing. A file
 that is named and is not there is a mistake, and is reported as one. A file
 that is not named and is not there is not a mistake at all: the defaults stand.
 
+The settings of the site the program was built from are not read out of the
+program. A copy of it serves the site it is told about, and a build from a
+folder that holds no settings file is published at the root: the links it
+writes carry no folder. A bundle is the one exception, and it is made on
+purpose: the settings that were in effect travel inside it.
+
 ## Where the writing lives
 
 Every folder under the writing folder is read, however deep. The folders are
@@ -322,12 +328,13 @@ post that does not carry the chosen depth opens at the nearest one it has,
 and leaves the choice alone; only moving the slider sets a new one.
 
 The server rereads the writing when a file changes, so you can edit a post and
-refresh the page. When it runs from the project folder, where the templates
-and the stylesheet are, it reads them from disk as well and live reloads
-them: a template edit refreshes the browser and a stylesheet edit appears
-without a page refresh. Give `--dev` and it does the same in any folder, and
-shows every error in full. Without either, the templates and the stylesheet
-come from inside the program, and the build uses those too.
+refresh the page. Give `--dev` and it also reads the templates and the
+stylesheet from disk, and tells an open browser when they change: a template
+edit refreshes the browser, a stylesheet edit appears without a page refresh,
+and an edited post refreshes the browser as well. `--dev` shows every error in
+full too. Without it, the templates and the stylesheet come from inside the
+program, and the build uses those too. The program does not guess: a folder
+that happens to hold a `templates` folder is not a reason to read from disk.
 
 ## draft and pinned
 

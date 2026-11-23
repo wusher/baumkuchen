@@ -200,9 +200,12 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 // files gives the templates and the stylesheet the pages are made from.
 //
 // They are the ones built into the program, so a copy of it stands on its
-// own. The serve command reads them from disk when the program is run from
-// the project folder, so that an edit shows up without a build, and --dev
-// asks for that in any folder.
+// own. The --dev flag asks for the ones on disk instead, and turns the live
+// reload on, so that an edit shows up without a build.
+//
+// The program does not guess: a folder that happens to hold a templates
+// folder is not a reason to read from disk. The flag is asked for, or the
+// templates come from inside the program.
 func (w *work) files() (templates, static fs.FS, live bool, err error) {
 	if w.dev() {
 		if _, err := os.Stat(filepath.Join("templates", "layout.html")); err != nil {
@@ -210,21 +213,7 @@ func (w *work) files() (templates, static fs.FS, live bool, err error) {
 		}
 		return os.DirFS("."), os.DirFS("."), true, nil
 	}
-	if w.cmd.name == "serve" && w.projectFolder() {
-		return os.DirFS("."), os.DirFS("."), true, nil
-	}
 	return fs.FS(templateFiles), fs.FS(staticFiles), false, nil
-}
-
-// projectFolder says whether the program is run from the project folder,
-// where the templates and the stylesheet live.
-func (w *work) projectFolder() bool {
-	for _, name := range []string{"templates/layout.html", "static/style.css"} {
-		if _, err := os.Stat(name); err != nil {
-			return false
-		}
-	}
-	return true
 }
 
 // dev says whether the development mode was asked for.

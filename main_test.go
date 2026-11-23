@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -252,6 +253,99 @@ func TestSettingsPathsAreRelativeToTheFile(t *testing.T) {
 	}
 	if got := set.resolve(set.file.Dist); got != filepath.Join(dir, "site") {
 		t.Errorf("the site is at %q, want %q", got, filepath.Join(dir, "site"))
+	}
+}
+
+// The settings the program was built with are not read: a copy of the program
+// does not inherit the site it came from. With no settings file anywhere, the
+// defaults in the code stand, and the site is published at the root.
+func TestTheSettingsDoNotComeFromInsideTheProgram(t *testing.T) {
+	// arrange
+	t.Chdir(t.TempDir())
+
+	// act
+	set, err := findSettings("", "", nil)
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.file.Base != "" {
+		t.Errorf("the base is %q, want the root: the settings of the site the "+
+			"program was built from must not be read", set.file.Base)
+	}
+	if set.from != "the defaults in the program" {
+		t.Errorf("the settings came from %q, want the defaults in the code", set.from)
+	}
+}
+
+// A build from a folder that holds no settings file is published at the root:
+// the links carry no folder, because no settings file was read.
+func TestABuildFromAnEmptyFolderCarriesNoFolder(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	posts := filepath.Join(dir, "posts")
+	write(t, filepath.Join(posts, "one.md"),
+		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	out := filepath.Join(dir, "site")
+	t.Chdir(t.TempDir())
+
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"build", "-o", out, posts}, &stdout, &stderr)
+
+	// assert
+	if code != 0 {
+		t.Fatalf("the code is %d, want 0 (the error stream said: %s)", code, stderr.String())
+	}
+	index, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatalf("the build did not write the index: %v", err)
+	}
+	if strings.Contains(string(index), "/baumkuchen/") {
+		t.Errorf("the built site carries a folder it was never given: %s", index)
+	}
+	if !strings.Contains(string(index), `href="/post/one"`) {
+		t.Errorf("the index does not link to the post at the root: %s", index)
+	}
+}
+
+// The program does not guess that it is in the project folder: the templates
+// and the stylesheet come from inside the program, and only --dev asks for the
+// ones on disk.
+func TestTheProgramDoesNotGuessTheFolder(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "templates", "layout.html"), "the layout")
+	write(t, filepath.Join(dir, "static", "style.css"), "body {}")
+	t.Chdir(dir)
+
+	// act
+	plain := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	templates, _, live, err := plain.files()
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live {
+		t.Error("the program turned the live reload on by itself")
+	}
+	if _, err := fs.Stat(templates, "templates/layout.html"); err != nil {
+		t.Errorf("the templates are not the ones inside the program: %v", err)
+	}
+
+	// and with --dev they are the ones on disk
+	dev := &work{cmd: &commandLine{name: "serve", given: map[string]bool{"dev": true}}}
+	templates, _, live, err = dev.files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !live {
+		t.Error("--dev did not turn the live reload on")
+	}
+	if _, err := fs.Stat(templates, "templates/layout.html"); err != nil {
+		t.Errorf("--dev did not read the templates from disk: %v", err)
 	}
 }
 

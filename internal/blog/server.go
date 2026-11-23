@@ -49,8 +49,9 @@ type Config struct {
 	Heading string
 	// Favicon is a local file to use instead of the icon in the posts folder.
 	Favicon string
-	// LiveReload rereads templates and tells an open browser when templates or
-	// stylesheets change. It is intended for the disk-backed development server.
+	// LiveReload rereads templates and tells an open browser when templates,
+	// stylesheets or the writing change. It is intended for the disk-backed
+	// development server.
 	LiveReload bool
 	// HideDrafts holds the drafts back. They are off the index and their
 	// addresses give a 404, so a site on the network shows only what is
@@ -346,6 +347,13 @@ func (s *Site) render(w http.ResponseWriter, status int, name string, data pageD
 	_, _ = w.Write(body)
 }
 
+// handleLiveReload tells the browser what has changed, so that it can refresh
+// itself.
+//
+// Three marks are given: the templates, the stylesheet and the writing. The
+// first two are the files the pages are made from; the third is the writing
+// itself, so an edited post refreshes the browser and not only the page the
+// writer happens to ask for.
 func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {
 	s.reloadTemplates()
 	cssVersion, err := filesVersion(s.static, "static/*.css")
@@ -359,7 +367,7 @@ func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"css": cssVersion, "templates": templateVersion,
+		"css": cssVersion, "templates": templateVersion, "posts": s.store.Version(),
 	})
 }
 
@@ -375,6 +383,10 @@ const liveReloadScript = `<script>
       const response = await fetch('/__baumkuchen_reload', {cache: 'no-store'});
       const next = await response.json();
       if (previous && next.templates !== previous.templates) {
+        location.reload();
+        return;
+      }
+      if (previous && next.posts !== previous.posts) {
         location.reload();
         return;
       }

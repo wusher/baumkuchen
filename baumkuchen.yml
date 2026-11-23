@@ -7,11 +7,9 @@
 # the name of the site, in the tab and as the wordmark
 title: Four Depths
 
-# the line under the wordmark
-heading:
-
-# the picture the browser shows on the tab
-favicon:
+# the optional homepage heading and local favicon override
+# heading: Choose how deep to read
+# favicon: ./my-icon.png
 
 # the folder the markdown is read from. It is a symlink here: the posts live
 # outside this repository. See `make link`.

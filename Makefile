@@ -27,7 +27,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 .PHONY: help setup link build release install releases bundle run lint check test cover clean new audit stats smoke export verify
 
 help: ## Show the targets
-	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*## /|/' | awk -F'|' '{printf "  %-7s %s\n", $$1, $$2}'
+	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*## /|/' | awk -F'|' '{printf "  %-9s %s\n", $$1, $$2}'
 
 setup: ## Link the posts folder, then download and verify the Go modules
 	@POSTS=$(POSTS) scripts/link-posts.sh
@@ -55,12 +55,13 @@ releases: ## The finished program for every system it runs on
 				-ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY)-$(VERSION)-$$os-$$arch$$ext . || exit 1; \
 		done; \
 	done
+	@cd $(BUILD) && { sha256sum $(BINARY)-$(VERSION)-* 2>/dev/null \
+		|| shasum -a 256 $(BINARY)-$(VERSION)-*; } > sha256sums.txt
 	@ls -l $(BUILD)
 
 bundle: ## One file with the program and the posts inside it (CONTENT=folder)
 	@test -n "$(CONTENT)" || { echo "bundle: name the folder with the posts: make bundle CONTENT=~/blog"; exit 1; }
-	@mkdir -p $(BUILD)
-	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BUILD)/$(BINARY) .
+	@$(MAKE) --no-print-directory release
 	$(BUILD)/$(BINARY) bundle $(CONTENT) -o $(BUILD)/$(BINARY)-bundle
 	@echo "$(BUILD)/$(BINARY)-bundle holds the program and the posts from $(CONTENT)"
 
@@ -94,8 +95,11 @@ cover: ## Run the tests and report what they cover
 
 export: ## Build the static site into ./$(DIST), with no draft in it
 	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
+export: ## Build the static site into ./$(DIST), with no draft in it
+	@case "$(DIST)" in ""|/|.|..|"$$HOME"|"$$HOME"/) \
 		echo "export: refusing to clean '$(DIST)'"; exit 1;; esac
-	go run . build --config $(CONFIG) --out $(DIST) --clean
+	@$(MAKE) --no-print-directory release
+	$(BUILD)/$(BINARY) build --config $(CONFIG) --out $(DIST) --clean
 
 verify: ## Say what is wrong with the posts, and stop on an error
 	go run . check --config $(CONFIG) --strict
@@ -116,5 +120,5 @@ smoke: ## Prove the finished program stands on its own, with the source away
 	scripts/smoke.sh
 
 clean: ## Remove the compiled programs
-	rm -f $(BINARY)
+	rm -f $(BINARY) .cover.out .pkg.out
 	rm -rf $(BUILD)

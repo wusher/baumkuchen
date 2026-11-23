@@ -11,10 +11,12 @@
 //	baumkuchen init my-blog        # a new site, with a settings file
 //	baumkuchen version             # say which build this is
 //
-// The templates, the stylesheet and the script are built into it, so a copy
-// of it runs anywhere, without the folder it was made in. The posts are not
-// built into it: they come from a folder you name, so a site is never a copy
-// of somebody else's writing by accident.
+// The templates, the stylesheet, the script and the settings are built into
+// it, so a copy of it runs anywhere, without the folder it was made in.
+//
+// The posts are not built into it: they come from a folder you name, so a site
+// is never a copy of somebody else's writing by accident. A copy of the
+// program with the posts inside is made on purpose: see `baumkuchen bundle`.
 //
 // Everything else is in internal/blog. This file holds the two embedded
 // folders, because //go:embed reads its paths from the folder of the package
@@ -35,6 +37,9 @@ var templateFiles embed.FS
 
 //go:embed static/*
 var staticFiles embed.FS
+
+//go:embed baumkuchen.yml
+var embeddedSettings []byte
 
 // The build puts its own name in here, so a copy of the program can say which
 // one it is.

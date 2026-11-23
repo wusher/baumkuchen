@@ -108,6 +108,43 @@ func TestLead(t *testing.T) {
 	}
 }
 
+// A picture never reaches the card, and its caption goes with it: the two
+// share one paragraph. The prose around them stays.
+func TestLeadDropsPictures(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	sentenceWithPicture := write(t, dir, "s.md",
+		"# T\n\n# Sentence\n\n![pen](/media/pen.jpg#right)\n*the caption*\n\nThe sentence stays.\n")
+	shortestStartsWithPicture := write(t, dir, "d.md",
+		"# T\n\n# Short\n\n![pen](/media/pen.jpg)\n\nFirst block of prose.\n\nSecond block.\n")
+
+	// act
+	a, err1 := ParsePost(sentenceWithPicture)
+	b, err2 := ParsePost(shortestStartsWithPicture)
+
+	// assert
+	if err1 != nil || err2 != nil {
+		t.Fatal(err1, err2)
+	}
+	lead := string(a.Lead())
+	if strings.Contains(lead, "<img") || strings.Contains(lead, "caption") {
+		t.Errorf("lead = %q, want no picture and no caption", lead)
+	}
+	if !strings.Contains(lead, "The sentence stays") {
+		t.Errorf("lead = %q, want the prose kept", lead)
+	}
+	fallback := string(b.Lead())
+	if strings.Contains(fallback, "<img") {
+		t.Errorf("lead = %q, want no picture", fallback)
+	}
+	if !strings.Contains(fallback, "First block of prose") {
+		t.Errorf("lead = %q, want the first block of prose", fallback)
+	}
+	if strings.Contains(fallback, "Second block") {
+		t.Errorf("lead = %q, want one block only", fallback)
+	}
+}
+
 // Html with no paragraph in it comes back whole.
 func TestFirstBlockWithNoParagraph(t *testing.T) {
 	// arrange

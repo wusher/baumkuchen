@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"baumkuchen/internal/blog"
-	"baumkuchen/internal/bundle"
+	"github.com/wusher/baumkuchen/internal/blog"
+	"github.com/wusher/baumkuchen/internal/bundle"
 )
 
 // The name of the settings file.
@@ -42,7 +42,8 @@ func (s *settings) resolve(path string) string {
 //
 // The file named on the command line comes first. Then the one in the posts
 // folder. Then the one in the working folder. Then the one inside a bundled
-// program. Last are the defaults in the code.
+// program. Then the one inside the program itself, so that a copy of it still
+// knows the site it was made from. Last are the defaults in the code.
 //
 // A file that is named and is not there is a mistake, and it is reported as
 // one. A file that is not named and is not there is not a mistake at all:
@@ -75,6 +76,16 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 				bytes: raw,
 			}, nil
 		}
+	}
+	// the settings the program was made with, so a copy of it still knows
+	// the site
+	if file, err := blog.Load(embeddedSettings); err == nil {
+		return &settings{
+			file:  file,
+			dir:   ".",
+			from:  "the settings inside the program",
+			bytes: embeddedSettings,
+		}, nil
 	}
 	return &settings{
 		file:  blog.Defaults(),

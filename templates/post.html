@@ -19,8 +19,11 @@
       <button class="step" id="shorter" type="button" aria-label="A shorter depth">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 5 L7.5 12 L14.5 19"/></svg>
       </button>
-      <input id="range" class="range" type="range" min="0" max="{{dec (len .Levels)}}" step="any" value="0"
-             aria-label="Reading depth" list="stops">
+      <div class="track" style="--n:{{dec (len .Levels)}}">
+        <span class="ticks" aria-hidden="true">{{range $i, $l := .Levels}}<i style="--i:{{$i}}"></i>{{end}}</span>
+        <input id="range" class="range" type="range" min="0" max="{{dec (len .Levels)}}" step="any" value="0"
+               aria-label="Reading depth" list="stops">
+      </div>
       <button class="step" id="longer" type="button" aria-label="A longer depth">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 5 L16.5 12 L9.5 19"/></svg>
       </button>

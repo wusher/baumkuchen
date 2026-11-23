@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 type Store struct {

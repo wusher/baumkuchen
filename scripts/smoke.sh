@@ -73,7 +73,9 @@ EOF
 mkdir -p "$work/away"
 
 # ---- the static site, built with the folder out of reach ----
-( cd "$work/away" && "$binary" build "$work/posts" --out "$work/site" ) >"$work/build.log" 2>&1 \
+# The base is given as an empty one: the settings inside the program carry the
+# folder the site is published in, and this build is at the root.
+( cd "$work/away" && "$binary" build "$work/posts" --base= --out "$work/site" ) >"$work/build.log" 2>&1 \
   || fail "the static build did not finish: $(cat "$work/build.log")"
 for f in index.html 404.html static/style.css static/app.js media/pic.jpg post/hello/index.html; do
   [ -f "$work/site/$f" ] || fail "the build did not write $f"

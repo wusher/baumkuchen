@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/wusher/baumkuchen/internal/blog"
 )
 
 // write puts a file in a folder, and makes the folders on the way.
@@ -317,6 +320,85 @@ func TestFindSettingsInsideTheProgram(t *testing.T) {
 	}
 	if set.file.Title != "The Inside One" {
 		t.Errorf("the title is %q, want the one inside the program", set.file.Title)
+	}
+}
+
+// The posts come from the folder named on the command line, then from the
+// environment, then from the settings, and last from the ones carried inside
+// the program.
+func TestThePostsComeFromTheRightPlace(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	other := t.TempDir()
+	t.Setenv("BAUMKUCHEN_POSTS", "")
+	set := &settings{file: blog.File{Posts: dir}, dir: "."}
+
+	// act + assert
+	// the folder named on the command line comes first
+	named := &work{cmd: &commandLine{name: "serve", folder: dir, given: map[string]bool{}}}
+	src, err := named.source(set)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !src.Exists() || src.Label() != dir {
+		t.Errorf("the posts came from %q, want %q", src.Label(), dir)
+	}
+
+	// then the one in the settings
+	fromFile := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	src, err = fromFile.source(set)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src.Label() != dir {
+		t.Errorf("the posts came from %q, want %q", src.Label(), dir)
+	}
+
+	// then the environment, when the folder was not named
+	t.Setenv("BAUMKUCHEN_POSTS", other)
+	fromEnv := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	src, err = fromEnv.source(set)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if src.Label() != other {
+		t.Errorf("the posts came from %q, want %q", src.Label(), other)
+	}
+	t.Setenv("BAUMKUCHEN_POSTS", "")
+
+	// a folder that is not there is an error, and says which one
+	missing := &work{cmd: &commandLine{name: "serve",
+		folder: filepath.Join(dir, "no-such-folder"), given: map[string]bool{}}}
+	if _, err := missing.source(set); err == nil {
+		t.Error("a folder that is not there must give an error")
+	}
+
+	// and a program with no posts at all says so
+	none := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	if _, err := none.source(&settings{file: blog.File{}, dir: "."}); err == nil {
+		t.Error("no posts at all must give an error")
+	}
+}
+
+// The build writes into the folder it was given, or into the one in the
+// settings when the flag was given with nothing after it.
+func TestTheBuildFolder(t *testing.T) {
+	// arrange
+	set := &settings{file: blog.File{Dist: "dist"}, dir: "/tmp/site"}
+
+	// act + assert
+	w := &work{cmd: &commandLine{name: "build", given: map[string]bool{}}}
+	if got := w.outFolder(set); got != filepath.Join("/tmp/site", "dist") {
+		t.Errorf("the site goes to %q, want the one in the settings", got)
+	}
+	named := &work{cmd: &commandLine{name: "build", given: map[string]bool{"out": true}}}
+	named.cmd.flags = flag.NewFlagSet("build", flag.ContinueOnError)
+	named.cmd.flags.String("out", "", "")
+	if err := named.cmd.flags.Set("out", "out"); err != nil {
+		t.Fatal(err)
+	}
+	if got := named.outFolder(set); got != "out" {
+		t.Errorf("the site goes to %q, want the one that was named", got)
 	}
 }
 

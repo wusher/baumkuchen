@@ -15,9 +15,9 @@ import (
 	"strings"
 	"syscall"
 
-	"baumkuchen/internal/blog"
-	"baumkuchen/internal/bundle"
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/blog"
+	"github.com/wusher/baumkuchen/internal/bundle"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // errQuiet is an error the command has already said out loud. The run ends
@@ -177,7 +177,7 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	if err != nil {
 		return nil, err
 	}
-	templateFS, staticFS, err := w.files()
+	templateFS, staticFS, live, err := w.files()
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 		Title:      set.file.Title,
 		Heading:    set.file.Heading,
 		Favicon:    set.file.Favicon,
-		LiveReload: w.dev(),
+		LiveReload: live,
 		HideDrafts: !drafts,
 		DevErrors:  w.dev(),
 	})
@@ -200,16 +200,31 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 // files gives the templates and the stylesheet the pages are made from.
 //
 // They are the ones built into the program, so a copy of it stands on its
-// own. With --dev they are the ones on disk, so that an edit shows up
-// without a build, and every error is shown in full.
-func (w *work) files() (templates, static fs.FS, err error) {
-	if !w.dev() {
-		return fs.FS(templateFiles), fs.FS(staticFiles), nil
+// own. The serve command reads them from disk when the program is run from
+// the project folder, so that an edit shows up without a build, and --dev
+// asks for that in any folder.
+func (w *work) files() (templates, static fs.FS, live bool, err error) {
+	if w.dev() {
+		if _, err := os.Stat(filepath.Join("templates", "layout.html")); err != nil {
+			return nil, nil, false, fmt.Errorf("--dev: there are no templates/layout.html here")
+		}
+		return os.DirFS("."), os.DirFS("."), true, nil
 	}
-	if _, err := os.Stat(filepath.Join("templates", "layout.html")); err != nil {
-		return nil, nil, fmt.Errorf("--dev: there are no templates/layout.html here")
+	if w.cmd.name == "serve" && w.projectFolder() {
+		return os.DirFS("."), os.DirFS("."), true, nil
 	}
-	return os.DirFS("."), os.DirFS("."), nil
+	return fs.FS(templateFiles), fs.FS(staticFiles), false, nil
+}
+
+// projectFolder says whether the program is run from the project folder,
+// where the templates and the stylesheet live.
+func (w *work) projectFolder() bool {
+	for _, name := range []string{"templates/layout.html", "static/style.css"} {
+		if _, err := os.Stat(name); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // dev says whether the development mode was asked for.

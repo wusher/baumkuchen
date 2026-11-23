@@ -4,23 +4,27 @@ package blog
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"html"
 	"html/template"
 	"io"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"path"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // Config is what a site needs to run. The two file systems are handed in by
@@ -41,9 +45,9 @@ type Config struct {
 	Base string
 	// Title is the name of the site.
 	Title string
-	// Heading is the line under the wordmark.
+	// Heading is the homepage h1. Empty hides it.
 	Heading string
-	// Favicon is the picture the browser shows on the tab.
+	// Favicon is a local file to use instead of the icon in the posts folder.
 	Favicon string
 	// LiveReload rereads templates and tells an open browser when templates or
 	// stylesheets change. It is intended for the disk-backed development server.
@@ -69,7 +73,7 @@ type Site struct {
 	base       string
 	title      string
 	heading    string
-	favicon    string
+	favicon    favicon
 	liveReload bool
 	hideDrafts bool
 	devErrors  bool
@@ -89,6 +93,10 @@ func New(cfg Config) (*Site, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the pictures: %w", err)
 	}
+	icon, err := loadFavicon(src, cfg.Favicon)
+	if err != nil {
+		return nil, err
+	}
 	pages, err := buildPages(cfg.Templates)
 	if err != nil {
 		return nil, fmt.Errorf("read templates: %w", err)
@@ -107,7 +115,7 @@ func New(cfg Config) (*Site, error) {
 		base:            cleanBase(cfg.Base),
 		title:           cfg.Title,
 		heading:         cfg.Heading,
-		favicon:         cfg.Favicon,
+		favicon:         icon,
 		liveReload:      cfg.LiveReload,
 		hideDrafts:      cfg.HideDrafts,
 		devErrors:       cfg.DevErrors,
@@ -138,10 +146,8 @@ type pageData struct {
 	// Color is the accent of the page being shown, if it asked for one.
 	Color string
 	// Site is the name of the whole site, for the tab and the wordmark.
-	Site string
-	// Heading is the line under the wordmark.
+	Site    string
 	Heading string
-	// Favicon is the picture the browser shows on the tab.
 	Favicon string
 	Year    int
 }
@@ -172,12 +178,62 @@ func (s *Site) routes() http.Handler {
 	mux.Handle("/static/", filesOnly(s.static))
 	mux.Handle("/media/", http.StripPrefix("/media/",
 		filesOnly(s.media)))
+	if s.favicon.name != "" {
+		mux.HandleFunc("/"+s.favicon.name, s.favicon.serve)
+	}
 	if s.liveReload {
 		mux.HandleFunc("/__baumkuchen_reload", s.handleLiveReload)
 	}
 	mux.HandleFunc("/post/", s.handlePost)
 	mux.HandleFunc("/", s.handleIndex)
 	return mux
+}
+
+// Serve answers on addr until it cannot, or until the program is told to
+// stop. Ctrl+C lets the requests in flight finish before the server goes.
+func (s *Site) Serve(addr string) error {
+	ln, err := s.Listen(addr)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return s.ServeOn(ln)
+}
+
+// Listen opens the socket and gives the listener back.
+//
+// The socket is opened before anything is served, so the address is known
+// before the site is announced: a port of 0 is a port the system picks, and
+// the site has to say which one it got.
+func (s *Site) Listen(addr string) (net.Listener, error) {
+	return net.Listen("tcp", addr)
+}
+
+// ServeOn answers on the listener until it cannot, or until the program is
+// told to stop. Ctrl+C lets the requests in flight finish before the server
+// goes.
+func (s *Site) ServeOn(ln net.Listener) error {
+	srv := &http.Server{
+		Handler:      s.routes(),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	failed := make(chan error, 1)
+	go func() { failed <- srv.Serve(ln) }()
+	select {
+	case err := <-failed:
+		return err
+	case <-ctx.Done():
+		log.Printf("stopping")
+		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdown); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	}
 }
 
 // filesOnly serves the files, and never the folders.
@@ -194,35 +250,6 @@ func filesOnly(files fs.FS) http.Handler {
 		}
 		server.ServeHTTP(w, r)
 	})
-}
-
-// Listen opens the socket and gives the listener back.
-//
-// The socket is opened before anything is served, so the address is known
-// before the site is announced: a port of 0 is a port the system picks, and
-// the site has to say which one it got.
-func (s *Site) Listen(addr string) (net.Listener, error) {
-	return net.Listen("tcp", addr)
-}
-
-// ServeOn answers on the listener until it cannot.
-func (s *Site) ServeOn(ln net.Listener) error {
-	srv := &http.Server{
-		Handler:      s.routes(),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
-	return srv.Serve(ln)
-}
-
-// Serve answers on addr until it cannot.
-func (s *Site) Serve(addr string) error {
-	ln, err := s.Listen(addr)
-	if err != nil {
-		return err
-	}
-	defer ln.Close()
-	return s.ServeOn(ln)
 }
 
 func (s *Site) reload() {
@@ -282,7 +309,9 @@ func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	data.Year = time.Now().Year()
 	data.Site = s.title
 	data.Heading = s.heading
-	data.Favicon = s.favicon
+	if s.favicon.name != "" {
+		data.Favicon = "/" + s.favicon.name
+	}
 	s.reloadTemplates()
 	s.templatesMu.RLock()
 	t, ok := s.pages[name]
@@ -293,33 +322,28 @@ func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 	return t.ExecuteTemplate(w, "layout", data)
 }
 
-func (s *Site) render(w http.ResponseWriter, name string, data pageData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+// render writes one page, whole or not at all: the page is built first, so a
+// template that fails gives a plain 500 with the error, never a half page or
+// an empty 200.
+func (s *Site) render(w http.ResponseWriter, status int, name string, data pageData) {
 	var page bytes.Buffer
 	if err := s.renderTo(&page, name, data); err != nil {
-		s.renderError(w, name, err)
+		log.Printf("render %s: %v", name, err)
+		// the writer at the desk gets the error; anyone else gets no detail
+		msg := "internal server error"
+		if s.liveReload || s.devErrors {
+			msg = fmt.Sprintf("render %s: %v", name, err)
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 	body := page.Bytes()
 	if s.liveReload {
 		body = bytes.Replace(body, []byte("</body>"), []byte(liveReloadScript+"</body>"), 1)
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	_, _ = w.Write(body)
-}
-
-// renderError says that a page did not come out.
-//
-// In development the error is on the page, in full: a writer is looking at
-// the browser and wants to know what went wrong. Otherwise it goes in the
-// log, and the reader gets nothing but an empty page.
-func (s *Site) renderError(w http.ResponseWriter, name string, err error) {
-	log.Printf("render %s: %v", name, err)
-	if !s.devErrors {
-		return
-	}
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "<!doctype html><meta charset=\"utf-8\"><title>%s</title><pre>%s</pre>",
-		html.EscapeString(name), html.EscapeString(err.Error()))
 }
 
 func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {
@@ -343,6 +367,10 @@ const liveReloadScript = `<script>
 (() => {
   let previous;
   async function check() {
+    if (document.hidden) {
+      setTimeout(check, 2000);
+      return;
+    }
     try {
       const response = await fetch('/__baumkuchen_reload', {cache: 'no-store'});
       const next = await response.json();
@@ -365,6 +393,22 @@ const liveReloadScript = `<script>
 })();
 </script>`
 
+// visible gives the posts the index shows: all of them, drafts among them,
+// unless the drafts are held back.
+func (s *Site) visible() []*Post {
+	all := s.store.Index()
+	if !s.hideDrafts {
+		return all
+	}
+	out := make([]*Post, 0, len(all))
+	for _, p := range all {
+		if !p.Draft {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		s.notFound(w)
@@ -372,7 +416,7 @@ func (s *Site) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reload()
 	pinned, rest := splitPinned(s.visible())
-	s.render(w, "index.html", pageData{
+	s.render(w, http.StatusOK, "index.html", pageData{
 		Title:  s.title,
 		Pinned: pinned,
 		Posts:  rest,
@@ -392,26 +436,9 @@ func (s *Site) handlePost(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w)
 		return
 	}
-	s.render(w, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color})
-}
-
-// visible gives the posts the index shows: the drafts are left out when the
-// site holds them back.
-func (s *Site) visible() []*Post {
-	all := s.store.Index()
-	if !s.hideDrafts {
-		return all
-	}
-	out := make([]*Post, 0, len(all))
-	for _, p := range all {
-		if !p.Draft {
-			out = append(out, p)
-		}
-	}
-	return out
+	s.render(w, http.StatusOK, "post.html", pageData{Title: p.Title, Post: p, Color: p.Color})
 }
 
 func (s *Site) notFound(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNotFound)
-	s.render(w, "404.html", pageData{Title: "Not here"})
+	s.render(w, http.StatusNotFound, "404.html", pageData{Title: "Not here"})
 }

@@ -15,9 +15,9 @@ import (
 type File struct {
 	// Title is the name of the site, in the tab and beside every page name.
 	Title string `yaml:"title"`
-	// Heading is the line under the wordmark: a strapline, or a subtitle.
+	// Heading is the homepage h1. Empty hides it.
 	Heading string `yaml:"heading"`
-	// Favicon is the picture the browser shows on the tab.
+	// Favicon overrides favicon.svg in the posts folder with a local file.
 	Favicon string `yaml:"favicon"`
 	// Posts is the folder the markdown is read from.
 	Posts string `yaml:"posts"`

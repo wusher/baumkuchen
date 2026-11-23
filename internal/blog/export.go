@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -59,6 +58,12 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 	if err := write(filepath.Join(dir, "404.html"), "404.html",
 		pageData{Title: "Not here"}); err != nil {
 		return n, err
+	}
+	if s.favicon.name != "" {
+		if err := os.WriteFile(filepath.Join(dir, s.favicon.name), s.favicon.data, 0o644); err != nil {
+			return n, err
+		}
+		n++
 	}
 	for _, p := range posts {
 		path := filepath.Join(dir, "post", p.Slug, "index.html")
@@ -205,22 +210,4 @@ func cleanBase(base string) string {
 		return ""
 	}
 	return "/" + base
-}
-
-func copyFile(from, to string) error {
-	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
-		return err
-	}
-	in, err := os.Open(from)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(to)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
 }

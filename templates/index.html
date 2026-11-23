@@ -2,6 +2,7 @@
   <li class="card">
     <a href="/post/{{.Slug}}">
       <h2>{{.Title}}</h2>
+      {{if not .Pinned}}{{with .Lead}}<div class="lead">{{.}}</div>{{end}}{{end}}
     </a>
     {{if or .Draft (not .Pinned)}}
     <p class="meta">
@@ -17,10 +18,11 @@
 {{end}}
 
 {{define "main"}}
+{{with .Heading}}
 <section class="intro">
-  <h1></h1>
-  <p></p>
+  <h1>{{.}}</h1>
 </section>
+{{end}}
 
 {{if .Pinned}}
 <ol class="feed pinned" role="list" aria-label="pages">

@@ -23,7 +23,7 @@ type Source interface {
 	// List gives every markdown file it holds, in order. The pictures and
 	// the hidden folders are left out: they are not posts.
 	List() ([]string, error)
-	// Read gives the bytes of one file, by the path List gave.
+	// Read gives the bytes of one file by its path relative to the content root.
 	Read(path string) ([]byte, error)
 	// Stat gives the size and the time of one file. The time is what the
 	// site watches: a file that changed is read again.

@@ -56,21 +56,35 @@ type Post struct {
 }
 
 // Lead gives the one sentence version. A post that does not carry that depth
-// gives the shortest depth it has.
+// gives the shortest depth it has. A picture never reaches the card: the card
+// is a line of prose, and a full picture would swallow the index.
 
 func (p *Post) Lead() template.HTML {
 	for _, l := range p.Levels {
 		if l.Key == "sentence" {
-			return l.HTML
+			return withoutPictures(l.HTML)
 		}
 	}
 	if len(p.Levels) > 0 {
-		return firstBlock(p.Levels[0].HTML)
+		return firstBlock(withoutPictures(p.Levels[0].HTML))
 	}
 	return ""
 }
 
 var firstPara = regexp.MustCompile(`(?s)<p>.*?</p>`)
+
+// withoutPictures drops every paragraph that holds a picture. The picture and
+// its caption share one paragraph, so the caption goes with it.
+
+func withoutPictures(h template.HTML) template.HTML {
+	s := firstPara.ReplaceAllStringFunc(string(h), func(p string) string {
+		if strings.Contains(p, "<img") {
+			return ""
+		}
+		return p
+	})
+	return template.HTML(strings.TrimSpace(s))
+}
 
 // firstBlock keeps the opening paragraph only, so a card stays a card when the
 // shortest depth a post carries is a long one.

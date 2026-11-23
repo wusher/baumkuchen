@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"baumkuchen/internal/content"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // The site reads the posts from a set of files, not from a folder: the same

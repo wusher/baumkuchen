@@ -111,6 +111,12 @@ fi
 [ "$published" = "1" ] || fail "the JSON says $published published, want 1"
 
 # ---- the live server, with the folder out of reach ----
+# A stylesheet sits in the folder the server runs from. It is not used: the
+# files on disk belong to the development mode, and the program stands on its
+# own.
+mkdir -p "$work/away/static"
+printf '/* the smoke test put this here */\nbody { outline: 3px solid red; }\n' \
+  > "$work/away/static/style.css"
 port=$(( 18000 + ($$ % 900) ))
 ( cd "$work/away" && exec "$binary" serve "$work/posts" --addr "127.0.0.1:$port" ) >"$work/serve.log" 2>&1 &
 server=$!
@@ -134,6 +140,20 @@ curl -s "http://127.0.0.1:$port/post/hello" | grep -q 'Hello There' \
   || fail "the post page does not hold its title"
 
 # ---- the live part: a post written after the start shows up ----
+# The browser is told when the writing changes, and that is on without --dev:
+# the page carries the watcher, and the writing has a mark of its own.
+# the mark the reload endpoint gives the writing
+postsversion() {
+  curl -s "http://127.0.0.1:$1/__baumkuchen_reload" \
+    | sed -n 's/.*"posts":"\([^"]*\)".*/\1/p'
+}
+
+curl -s "http://127.0.0.1:$port/" | grep -q '__baumkuchen_reload' \
+  || fail "the ordinary page does not carry the reload script"
+before="$(postsversion "$port")"
+[ -n "$before" ] || fail "the reload endpoint says nothing about the writing"
+[ "$before" = "$(postsversion "$port")" ] \
+  || fail "the mark of the writing changed with nothing to change"
 printf '\n# Paragraph\n\nA paragraph written after the server started.\n' >> "$work/posts/posts/hello.md"
 changed=0
 for _ in $(seq 1 50); do
@@ -143,6 +163,13 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 [ "$changed" = 1 ] || fail "the server did not show the change"
+after="$(postsversion "$port")"
+[ -n "$after" ] || fail "the reload endpoint says nothing about the writing"
+[ "$after" != "$before" ] || fail "the edit to the post did not change the mark"
+# the stylesheet on disk is not the one that is served
+if curl -s "http://127.0.0.1:$port/static/style.css" | grep -q 'the smoke test put this here'; then
+  fail "the ordinary server served a stylesheet from disk"
+fi
 
 # ---- the drafts are shown on the loopback address ----
 [ "$(code /post/hidden)" = "200" ] || fail "a draft is not shown on the loopback address"
@@ -218,19 +245,27 @@ for _ in $(seq 1 50); do
 done
 [ "$changed" = 1 ] || fail "the change to the template was not seen by the browser"
 
+# ---- the stylesheet comes from the disk in the development mode ----
+printf '\n/* the smoke test changed this */\nbody { outline: 3px solid red; }\n' \
+  >> "$work/dev/static/style.css"
+csschanged=0
+for _ in $(seq 1 50); do
+  if curl -s "http://127.0.0.1:$devport/static/style.css" | grep -q 'the smoke test changed this'; then
+    csschanged=1; break
+  fi
+  sleep 0.1
+done
+[ "$csschanged" = 1 ] || fail "the development server did not serve the stylesheet from disk"
+
 # ---- an edited post reaches the browser as well ----
 # The writing has a version of its own: when a post is edited, the browser is
 # told that it changed, and refreshes itself.
-postsversion() {
-  curl -s "http://127.0.0.1:$devport/__baumkuchen_reload" \
-    | sed -n 's/.*"posts":"\([^"]*\)".*/\1/p'
-}
-postsbefore="$(postsversion)"
+postsbefore="$(postsversion "$devport")"
 [ -n "$postsbefore" ] || fail "the reload endpoint says nothing about the writing"
 printf '\n# Paragraph\n\nA line written while the server was watching.\n' >> "$work/posts/posts/hello.md"
 postschanged=0
 for _ in $(seq 1 50); do
-  postsafter="$(postsversion)"
+  postsafter="$(postsversion "$devport")"
   if [ -n "$postsafter" ] && [ "$postsafter" != "$postsbefore" ]; then postschanged=1; break; fi
   sleep 0.1
 done
@@ -274,5 +309,5 @@ code=0
 [ "$code" = 2 ] || fail "the removed posts flag gave $code, want 2"
 
 echo "smoke: the program stands on its own: the static site, the live server,"
-echo "smoke: the pictures, the change after the start, the drafts and the"
-echo "smoke: bundle all work."
+echo "smoke: the pictures, the change after the start, the browser told about"
+echo "smoke: it, the drafts and the bundle all work."

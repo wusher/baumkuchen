@@ -134,7 +134,8 @@ func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
 	postFile(t, posts, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
 	files := os.DirFS(root)
 	site, err := New(Config{
-		Posts: posts, Templates: files, Static: files, LiveReload: true,
+		Posts: posts, Templates: files, Static: files,
+		LiveReload: true, DevFiles: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -207,6 +208,105 @@ func TestTheBrowserIsToldWhenAPostChanges(t *testing.T) {
 	if !strings.Contains(liveReloadScript, "next.posts !== previous.posts") {
 		t.Error("the watcher does not refresh the browser when the writing changes")
 	}
+}
+
+// The files on disk belong to the development mode: without it, a change to a
+// template on disk does not reach the page, and with it, it does.
+func TestTheFilesOnDiskBelongToTheDevelopmentMode(t *testing.T) {
+	// arrange
+	root := templatesOnDisk(t)
+	posts := t.TempDir()
+	postFile(t, posts, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	files := os.DirFS(root)
+	plain, err := New(Config{
+		Posts: posts, Templates: files, Static: files, LiveReload: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev, err := New(Config{
+		Posts: posts, Templates: files, Static: files,
+		LiveReload: true, DevFiles: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := servedIndex(plain)
+
+	// act
+	changeTheTemplate(t, root)
+	afterPlain := servedIndex(plain)
+	afterDev := servedIndex(dev)
+
+	// assert
+	if !strings.Contains(before, `class="feed"`) {
+		t.Fatal("the page does not carry the template it was made from")
+	}
+	if strings.Contains(afterPlain, `class="feed fresh"`) {
+		t.Error("a template on disk reached the page without the development mode")
+	}
+	if !strings.Contains(afterDev, `class="feed fresh"`) {
+		t.Error("the development mode did not read the template from disk")
+	}
+}
+
+// The error in full is for the development mode: an ordinary server says that
+// the page failed, and keeps the detail to itself.
+func TestTheErrorInFullIsForTheDevelopmentMode(t *testing.T) {
+	// arrange
+	site, _ := siteWithPosts(t)
+	site.liveReload = true // the server watches the writing
+
+	// act
+	plain := httptest.NewRecorder()
+	site.render(plain, http.StatusInternalServerError, "nowhere.html", pageData{})
+	full := httptest.NewRecorder()
+	site.devErrors = true
+	site.render(full, http.StatusInternalServerError, "nowhere.html", pageData{})
+
+	// assert
+	if strings.Contains(plain.Body.String(), "no page named") {
+		t.Error("an ordinary server showed the error in full")
+	}
+	if !strings.Contains(full.Body.String(), "no page named") {
+		t.Error("the development mode did not show the error in full")
+	}
+}
+
+// templatesOnDisk makes a folder with the real templates and a stylesheet in
+// it, and gives the folder back.
+func templatesOnDisk(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, dir := range []string{"templates", "static"} {
+		if err := os.Mkdir(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"layout.html", "index.html", "post.html", "404.html"} {
+		body, err := os.ReadFile(filepath.Join("..", "..", "templates", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		write(t, filepath.Join(root, "templates"), name, string(body))
+	}
+	write(t, filepath.Join(root, "static"), "style.css", "body { color: red; }")
+	return root
+}
+
+// changeTheTemplate marks the template on disk, so that a server watching it
+// can see that it changed.
+func changeTheTemplate(t *testing.T, root string) {
+	t.Helper()
+	path := filepath.Join(root, "templates", "index.html")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "templates"), "index.html",
+		strings.Replace(string(body),
+			`<ol class="feed" role="list" aria-label="posts">`,
+			`<ol class="feed fresh" role="list" aria-label="posts">`, 1))
 }
 
 func servedIndex(site *Site) string {

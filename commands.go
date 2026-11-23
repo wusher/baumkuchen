@@ -168,6 +168,10 @@ func (w *work) source(set *settings) (content.Source, error) {
 
 // site makes the site a command works on: the settings, the posts, and the
 // files the pages are made from.
+//
+// The running server watches the writing, so that an edited post refreshes
+// the browser by itself. The --dev flag adds the files on disk and the errors
+// in full.
 func (w *work) site(drafts bool) (*blog.Site, error) {
 	set, err := w.settings()
 	if err != nil {
@@ -177,7 +181,7 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	if err != nil {
 		return nil, err
 	}
-	templateFS, staticFS, live, err := w.files()
+	templateFS, staticFS, err := w.files()
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +195,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 		Title:      set.file.Title,
 		Heading:    set.file.Heading,
 		Favicon:    set.file.Favicon,
-		LiveReload: live,
+		LiveReload: w.watching(),
+		DevFiles:   w.dev(),
 		HideDrafts: !drafts,
 		DevErrors:  w.dev(),
 	})
@@ -200,21 +205,28 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 // files gives the templates and the stylesheet the pages are made from.
 //
 // They are the ones built into the program, so a copy of it stands on its
-// own. The --dev flag asks for the ones on disk instead, and turns the live
-// reload on, so that an edit shows up without a build.
+// own. The --dev flag asks for the ones on disk instead, so that a change to
+// a template or to the stylesheet shows up without a build.
 //
 // The program does not guess: a folder that happens to hold a templates
 // folder is not a reason to read from disk. The flag is asked for, or the
 // templates come from inside the program.
-func (w *work) files() (templates, static fs.FS, live bool, err error) {
+func (w *work) files() (templates, static fs.FS, err error) {
 	if w.dev() {
 		if _, err := os.Stat(filepath.Join("templates", "layout.html")); err != nil {
-			return nil, nil, false, fmt.Errorf("--dev: there are no templates/layout.html here")
+			return nil, nil, fmt.Errorf("--dev: there are no templates/layout.html here")
 		}
-		return os.DirFS("."), os.DirFS("."), true, nil
+		return os.DirFS("."), os.DirFS("."), nil
 	}
-	return fs.FS(templateFiles), fs.FS(staticFiles), false, nil
+	return fs.FS(templateFiles), fs.FS(staticFiles), nil
 }
+
+// watching says whether an open browser is told when the writing changes.
+//
+// The running server watches, so that an edited post refreshes the page
+// itself. The build does not watch, and writes no watcher into the pages it
+// writes.
+func (w *work) watching() bool { return w.cmd.name == "serve" }
 
 // dev says whether the development mode was asked for.
 func (w *work) dev() bool { return w.cmd.was("dev") }

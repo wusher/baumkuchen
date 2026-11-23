@@ -49,10 +49,13 @@ type Config struct {
 	Heading string
 	// Favicon is a local file to use instead of the icon in the posts folder.
 	Favicon string
-	// LiveReload rereads templates and tells an open browser when templates,
-	// stylesheets or the writing change. It is intended for the disk-backed
-	// development server.
+	// LiveReload tells an open browser when the writing changes, so that an
+	// edited post refreshes the page instead of waiting for the writer to
+	// press the button. The running server always does this.
 	LiveReload bool
+	// DevFiles says the templates and the stylesheet come from disk, and are
+	// read again when they change. Only the development mode asks for it.
+	DevFiles bool
 	// HideDrafts holds the drafts back. They are off the index and their
 	// addresses give a 404, so a site on the network shows only what is
 	// finished. By default they are shown, marked as drafts, because a
@@ -76,6 +79,7 @@ type Site struct {
 	heading    string
 	favicon    favicon
 	liveReload bool
+	devFiles   bool
 	hideDrafts bool
 	devErrors  bool
 
@@ -118,6 +122,7 @@ func New(cfg Config) (*Site, error) {
 		heading:         cfg.Heading,
 		favicon:         icon,
 		liveReload:      cfg.LiveReload,
+		devFiles:        cfg.DevFiles,
 		hideDrafts:      cfg.HideDrafts,
 		devErrors:       cfg.DevErrors,
 		templateVersion: templateVersion,
@@ -262,8 +267,11 @@ func (s *Site) reload() {
 // reloadTemplates replaces the cached templates only after every page parses.
 // A half-written template therefore leaves the last good page in place and is
 // tried again after the file changes once more.
+//
+// The templates inside the program never change, so they are read again only
+// when they come from disk: that is the development mode, and nothing else.
 func (s *Site) reloadTemplates() {
-	if !s.liveReload {
+	if !s.devFiles {
 		return
 	}
 	version, err := filesVersion(s.templates, "templates/*.html")
@@ -332,7 +340,7 @@ func (s *Site) render(w http.ResponseWriter, status int, name string, data pageD
 		log.Printf("render %s: %v", name, err)
 		// the writer at the desk gets the error; anyone else gets no detail
 		msg := "internal server error"
-		if s.liveReload || s.devErrors {
+		if s.devErrors {
 			msg = fmt.Sprintf("render %s: %v", name, err)
 		}
 		http.Error(w, msg, http.StatusInternalServerError)
@@ -351,7 +359,8 @@ func (s *Site) render(w http.ResponseWriter, status int, name string, data pageD
 // itself.
 //
 // Three marks are given: the templates, the stylesheet and the writing. The
-// first two are the files the pages are made from; the third is the writing
+// first two are the files the pages are made from, and they move only in the
+// development mode, where they come from disk; the third is the writing
 // itself, so an edited post refreshes the browser and not only the page the
 // writer happens to ask for.
 func (s *Site) handleLiveReload(w http.ResponseWriter, _ *http.Request) {

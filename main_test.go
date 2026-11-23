@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -322,31 +324,139 @@ func TestTheProgramDoesNotGuessTheFolder(t *testing.T) {
 
 	// act
 	plain := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
-	templates, _, live, err := plain.files()
+	templates, _, err := plain.files()
 
 	// assert
 	if err != nil {
 		t.Fatal(err)
 	}
-	if live {
-		t.Error("the program turned the live reload on by itself")
+	body, err := fs.ReadFile(templates, "templates/layout.html")
+	if err != nil {
+		t.Fatalf("the templates cannot be read: %v", err)
 	}
-	if _, err := fs.Stat(templates, "templates/layout.html"); err != nil {
-		t.Errorf("the templates are not the ones inside the program: %v", err)
+	if string(body) == "the layout" {
+		t.Error("the program read the templates from disk by itself")
 	}
 
 	// and with --dev they are the ones on disk
 	dev := &work{cmd: &commandLine{name: "serve", given: map[string]bool{"dev": true}}}
-	templates, _, live, err = dev.files()
+	templates, _, err = dev.files()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !live {
-		t.Error("--dev did not turn the live reload on")
+	body, err = fs.ReadFile(templates, "templates/layout.html")
+	if err != nil {
+		t.Fatalf("the templates cannot be read: %v", err)
 	}
-	if _, err := fs.Stat(templates, "templates/layout.html"); err != nil {
-		t.Errorf("--dev did not read the templates from disk: %v", err)
+	if string(body) != "the layout" {
+		t.Error("--dev did not read the templates from disk")
 	}
+}
+
+// The server always watches the writing: an edited post refreshes the
+// browser, with or without --dev. The build does not watch, and writes no
+// watcher into the pages it writes.
+func TestTheServerAlwaysWatchesTheWriting(t *testing.T) {
+	cases := []struct {
+		name string
+		cmd  *commandLine
+		want bool
+	}{
+		{"serve", &commandLine{name: "serve", given: map[string]bool{}}, true},
+		{"serve with --dev", &commandLine{name: "serve", given: map[string]bool{"dev": true}}, true},
+		{"build", &commandLine{name: "build", given: map[string]bool{}}, false},
+		{"check", &commandLine{name: "check", given: map[string]bool{}}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// act
+			w := &work{cmd: c.cmd}
+
+			// assert
+			if got := w.watching(); got != c.want {
+				t.Errorf("watching() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+// The ordinary server tells an open browser when the writing changes: the
+// page carries the watcher, and the mark of the writing moves when a post is
+// edited and stays where it is while nothing changes.
+func TestTheServerTellsTheBrowserWhenTheWritingChanges(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	posts := filepath.Join(dir, "posts")
+	write(t, filepath.Join(posts, "one.md"),
+		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	w := &work{cmd: &commandLine{name: "serve", folder: posts, given: map[string]bool{}}}
+	site, err := w.site(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := site.Listen("127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go site.ServeOn(ln)
+	url := "http://" + ln.Addr().String()
+
+	// act
+	page := fetch(t, url+"/")
+	before := marks(t, url)
+	again := marks(t, url)
+	write(t, filepath.Join(posts, "one.md"),
+		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# One\n\n# Sentence\n\n"+
+			"A line written after the server started.\n")
+	after := marks(t, url)
+
+	// assert
+	if !strings.Contains(page, "/__baumkuchen_reload") {
+		t.Error("the served page does not carry the watcher")
+	}
+	if before["posts"] == "" {
+		t.Fatalf("the reload endpoint does not say what the writing is: %v", before)
+	}
+	if before["posts"] != again["posts"] {
+		t.Error("the mark of the writing changed with nothing to change")
+	}
+	if before["posts"] == after["posts"] {
+		t.Error("the mark of the writing did not change after an edit")
+	}
+}
+
+// fetch reads one page from a server that is running.
+func fetch(t *testing.T, url string) string {
+	t.Helper()
+	res, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+// marks asks the reload endpoint what has changed.
+func marks(t *testing.T, url string) map[string]string {
+	t.Helper()
+	res, err := http.Get(url + "/__baumkuchen_reload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the reload endpoint gave %d, want 200", res.StatusCode)
+	}
+	var out map[string]string
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // The drafts are shown on the loopback address, and held back anywhere else.

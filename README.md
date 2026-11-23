@@ -327,14 +327,17 @@ The reader's depth is kept between posts, in `localStorage` under `depth`. A
 post that does not carry the chosen depth opens at the nearest one it has,
 and leaves the choice alone; only moving the slider sets a new one.
 
-The server rereads the writing when a file changes, so you can edit a post and
-refresh the page. Give `--dev` and it also reads the templates and the
-stylesheet from disk, and tells an open browser when they change: a template
-edit refreshes the browser, a stylesheet edit appears without a page refresh,
-and an edited post refreshes the browser as well. `--dev` shows every error in
-full too. Without it, the templates and the stylesheet come from inside the
-program, and the build uses those too. The program does not guess: a folder
-that happens to hold a `templates` folder is not a reason to read from disk.
+The server rereads the writing when a file changes, and tells an open browser
+about it, so that an edited post refreshes the page by itself. That is always
+on: the server watches the writing, with `--dev` or without it.
+
+Give `--dev` and it also reads the templates and the stylesheet from disk, and
+tells an open browser when they change: a template edit refreshes the browser
+and a stylesheet edit appears without a page refresh. `--dev` shows every
+error in full too. Without it, the templates and the stylesheet come from
+inside the program, and the build uses those too. The program does not guess:
+a folder that happens to hold a `templates` folder is not a reason to read
+from disk.
 
 ## draft and pinned
 

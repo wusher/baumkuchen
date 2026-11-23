@@ -42,8 +42,13 @@ func (s *settings) resolve(path string) string {
 //
 // The file named on the command line comes first. Then the one in the posts
 // folder. Then the one in the working folder. Then the one inside a bundled
-// program. Then the one inside the program itself, so that a copy of it still
-// knows the site it was made from. Last are the defaults in the code.
+// program, which carries the settings it was made with. Last are the defaults
+// in the code.
+//
+// The settings the program was made with are not read. A copy of the program
+// does not inherit the site it was built from: a build from a folder that
+// holds no settings file is published at the root, and the links it writes
+// carry no folder.
 //
 // A file that is named and is not there is a mistake, and it is reported as
 // one. A file that is not named and is not there is not a mistake at all:
@@ -77,16 +82,8 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 			}, nil
 		}
 	}
-	// the settings the program was made with, so a copy of it still knows
-	// the site
-	if file, err := blog.Load(embeddedSettings); err == nil {
-		return &settings{
-			file:  file,
-			dir:   ".",
-			from:  "the settings inside the program",
-			bytes: embeddedSettings,
-		}, nil
-	}
+	// the settings the program was made with are not read: a copy of it does
+	// not inherit the site it was built from
 	return &settings{
 		file:  blog.Defaults(),
 		dir:   ".",

@@ -183,6 +183,32 @@ func TestLiveReloadsTemplatesAndCSS(t *testing.T) {
 	}
 }
 
+// An edited post is reported through the reload protocol, so that a browser
+// that is open refreshes itself: the writing has a version of its own, and it
+// changes when a file changes.
+func TestTheBrowserIsToldWhenAPostChanges(t *testing.T) {
+	// arrange
+	site, dir := siteWithPosts(t)
+	before := reloadVersions(t, site)
+
+	// act
+	write(t, dir, "open.md",
+		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# Open\n\n# Sentence\n\n"+
+			"A line written after the server started.\n")
+	after := reloadVersions(t, site)
+
+	// assert
+	if before["posts"] == "" || after["posts"] == "" {
+		t.Fatalf("the reload endpoint does not say what the writing is: %v", after)
+	}
+	if before["posts"] == after["posts"] {
+		t.Error("the writing did not change its version after an edit")
+	}
+	if !strings.Contains(liveReloadScript, "next.posts !== previous.posts") {
+		t.Error("the watcher does not refresh the browser when the writing changes")
+	}
+}
+
 func servedIndex(site *Site) string {
 	rec := httptest.NewRecorder()
 	site.handleIndex(rec, httptest.NewRequest(http.MethodGet, "/", nil))

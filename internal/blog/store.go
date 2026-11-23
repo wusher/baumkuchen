@@ -6,6 +6,8 @@
 package blog
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"path"
@@ -90,6 +92,20 @@ func (s *Store) fingerprint() string {
 		fmt.Fprintf(&b, "%s:%d:%d;", file, fi.Size(), fi.ModTime().UnixNano())
 	}
 	return b.String()
+}
+
+// Version gives a mark for the writing as it is now.
+//
+// Two calls give the same mark while nothing has changed, and different marks
+// when a file has changed. A browser asks for it, so that an edited post
+// refreshes the page instead of waiting for the writer to press the button.
+//
+// The mark is about the files, not about what was read from them: a file
+// that was changed and cannot be read still changes the mark, because the
+// writer has to see what is wrong with it.
+func (s *Store) Version() string {
+	sum := sha256.Sum256([]byte(s.fingerprint()))
+	return hex.EncodeToString(sum[:])
 }
 
 // Refresh rereads the folder only when a file changed.

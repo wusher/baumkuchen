@@ -73,9 +73,10 @@ EOF
 mkdir -p "$work/away"
 
 # ---- the static site, built with the folder out of reach ----
-# The base is given as an empty one: the settings inside the program carry the
-# folder the site is published in, and this build is at the root.
-( cd "$work/away" && "$binary" build "$work/posts" --base= --out "$work/site" ) >"$work/build.log" 2>&1 \
+# No base is given: the settings of the repository are not read out of the
+# program, so the program reads none, and the defaults in the code publish the
+# site at the root.
+( cd "$work/away" && "$binary" build "$work/posts" --out "$work/site" ) >"$work/build.log" 2>&1 \
   || fail "the static build did not finish: $(cat "$work/build.log")"
 for f in index.html 404.html static/style.css static/app.js media/pic.jpg post/hello/index.html; do
   [ -f "$work/site/$f" ] || fail "the build did not write $f"
@@ -217,17 +218,43 @@ for _ in $(seq 1 50); do
 done
 [ "$changed" = 1 ] || fail "the change to the template was not seen by the browser"
 
+# ---- an edited post reaches the browser as well ----
+# The writing has a version of its own: when a post is edited, the browser is
+# told that it changed, and refreshes itself.
+postsversion() {
+  curl -s "http://127.0.0.1:$devport/__baumkuchen_reload" \
+    | sed -n 's/.*"posts":"\([^"]*\)".*/\1/p'
+}
+postsbefore="$(postsversion)"
+[ -n "$postsbefore" ] || fail "the reload endpoint says nothing about the writing"
+printf '\n# Paragraph\n\nA line written while the server was watching.\n' >> "$work/posts/posts/hello.md"
+postschanged=0
+for _ in $(seq 1 50); do
+  postsafter="$(postsversion)"
+  if [ -n "$postsafter" ] && [ "$postsafter" != "$postsbefore" ]; then postschanged=1; break; fi
+  sleep 0.1
+done
+[ "$postschanged" = 1 ] || fail "the edit to the post was not seen by the browser"
+curl -s "http://127.0.0.1:$devport/post/hello" | grep -q 'written while the server was watching' \
+  || fail "the page does not hold the writing as it is now"
+
 kill "$server" 2>/dev/null || true
 server=""
 
 # ---- one file with the program and the posts inside it ----
-"$binary" bundle "$work/posts" -o "$work/bundle" >"$work/bundle.log" 2>&1 \
+# The bundle is made from the empty folder, so the settings of the repository
+# are not read: the bundle carries the settings that were in effect, which are
+# the ones in the code.
+( cd "$work/away" && "$binary" bundle "$work/posts" -o "$work/bundle" ) >"$work/bundle.log" 2>&1 \
   || fail "the bundle did not build: $(cat "$work/bundle.log")"
 [ -x "$work/bundle" ] || fail "the bundle is not there"
 ( cd "$work/away" && "$work/bundle" build --out "$work/away/site2" ) >"$work/bundle-build.log" 2>&1 \
   || fail "the bundle did not build the site: $(cat "$work/bundle-build.log")"
 [ -f "$work/away/site2/post/hello/index.html" ] || fail "the bundle did not write the post"
 [ -f "$work/away/site2/media/pic.jpg" ] || fail "the bundle did not write the picture"
+if grep -q '/baumkuchen/' "$work/away/site2/index.html"; then
+  fail "the bundle carries a folder it was never given"
+fi
 
 # ---- a program with no posts says so, and names the ways to give it some ----
 if ( cd "$work/away" && "$binary" build --out "$work/away/site3" ) >"$work/noposts.log" 2>&1; then

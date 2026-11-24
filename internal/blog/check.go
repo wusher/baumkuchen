@@ -93,7 +93,7 @@ func (s *Site) depthFindings(p *Post) []Finding {
 	if len(p.Missing) == 0 {
 		return nil
 	}
-	if len(p.Missing) == len(depthNames) {
+	if len(p.Missing) == depthCount() {
 		if p.Draft {
 			return []Finding{{
 				Level:   "warning",
@@ -119,9 +119,6 @@ func (s *Site) depthFindings(p *Post) []Finding {
 		Message: "no depth for: " + strings.Join(p.Missing, ", "),
 	}}
 }
-
-// depthNames are the five depths, in the order the site holds them.
-var depthNames = []string{"Sentence", "Paragraph", "Short", "Medium", "Long"}
 
 // dateFindings says what is wrong with the date of a post.
 func (s *Site) dateFindings(p *Post) []Finding {

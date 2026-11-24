@@ -67,6 +67,12 @@ type Config struct {
 	// DevErrors shows a page that failed to render, with the error on it,
 	// rather than a log line and an empty page.
 	DevErrors bool
+	// Info says what is happening, as the site goes along. It is thrown away
+	// when the program is asked to be quiet.
+	Info *log.Logger
+	// Warn says what is wrong with the posts. It is never thrown away: a
+	// warning is a thing the writer has to know.
+	Warn *log.Logger
 }
 
 // Site is one blog: the posts it has read, and the pages it can write.
@@ -85,6 +91,8 @@ type Site struct {
 	devFiles   bool
 	hideDrafts bool
 	devErrors  bool
+	info       *log.Logger
+	warn       *log.Logger
 
 	templatesMu     sync.RWMutex
 	templateVersion string
@@ -93,6 +101,15 @@ type Site struct {
 
 // New reads the posts and builds the pages.
 func New(cfg Config) (*Site, error) {
+	// A site that was made without a logger says nothing: the log of the
+	// program is the one that says what is happening, and the one that says
+	// what is wrong.
+	if cfg.Info == nil {
+		cfg.Info = log.New(io.Discard, "", 0)
+	}
+	if cfg.Warn == nil {
+		cfg.Warn = log.New(io.Discard, "", 0)
+	}
 	src := cfg.Content
 	if src == nil {
 		src = content.NewDir(cfg.Posts)
@@ -128,13 +145,28 @@ func New(cfg Config) (*Site, error) {
 		devFiles:        cfg.DevFiles,
 		hideDrafts:      cfg.HideDrafts,
 		devErrors:       cfg.DevErrors,
+		info:            cfg.Info,
+		warn:            cfg.Warn,
 		templateVersion: templateVersion,
 		templateSeen:    templateVersion,
 	}
+	s.store.warn = cfg.Warn
 	if err = s.store.Refresh(); err != nil {
 		return nil, fmt.Errorf("read posts: %w", err)
 	}
 	return s, nil
+}
+
+// say says what is happening, as the site goes along.
+//
+// The quiet flag of the program hides it.
+func (s *Site) say(format string, args ...any) {
+	s.info.Printf(format, args...)
+}
+
+// warn says what is wrong with the posts. It is never hidden.
+func (s *Site) warnf(format string, args ...any) {
+	s.warn.Printf(format, args...)
 }
 
 // Counts gives what the command prints when it starts.
@@ -235,7 +267,7 @@ func (s *Site) ServeOn(ln net.Listener) error {
 	case err := <-failed:
 		return err
 	case <-ctx.Done():
-		log.Printf("stopping")
+		s.say("stopping")
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdown); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -263,7 +295,7 @@ func filesOnly(files fs.FS) http.Handler {
 
 func (s *Site) reload() {
 	if err := s.store.Refresh(); err != nil {
-		log.Printf("reload: %v", err)
+		s.warnf("reload: %v", err)
 	}
 }
 
@@ -279,7 +311,7 @@ func (s *Site) reloadTemplates() {
 	}
 	version, err := filesVersion(s.templates, "templates/*.html")
 	if err != nil {
-		log.Printf("reload templates: %v", err)
+		s.warnf("reload templates: %v", err)
 		return
 	}
 
@@ -291,7 +323,7 @@ func (s *Site) reloadTemplates() {
 	s.templateSeen = version
 	pages, err := buildPages(s.templates)
 	if err != nil {
-		log.Printf("reload templates: %v", err)
+		s.warnf("reload templates: %v", err)
 		return
 	}
 	s.pages = pages
@@ -340,7 +372,7 @@ func (s *Site) renderTo(w io.Writer, name string, data pageData) error {
 func (s *Site) render(w http.ResponseWriter, status int, name string, data pageData) {
 	var page bytes.Buffer
 	if err := s.renderTo(&page, name, data); err != nil {
-		log.Printf("render %s: %v", name, err)
+		s.warnf("render %s: %v", name, err)
 		// the writer at the desk gets the error; anyone else gets no detail
 		msg := "internal server error"
 		if s.devErrors {

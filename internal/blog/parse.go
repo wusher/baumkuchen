@@ -37,6 +37,12 @@ var levelSpec = []struct {
 // alias here catches a common misspelling; the older, longer names
 // ("one sentence", "three paragraphs", "one page", "three pages") do not work.
 
+// depthCount gives how many depths a post can carry.
+//
+// The table above is the one place that says how many depths there are, and
+// this counts them.
+func depthCount() int { return len(levelSpec) }
+
 var headAlias = map[string]string{
 	"sentance": "sentence",
 }

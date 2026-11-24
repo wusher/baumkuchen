@@ -23,6 +23,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 
 The folder is the one with the markdown in it. It may come before or after
 the flags. A folder whose name is the name of a command is written with a
@@ -49,6 +50,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen build --help =====
 baumkuchen build — write the static site, then stop
 
@@ -68,6 +70,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen bundle --help =====
 baumkuchen bundle — write one file with the program and the posts inside it
 
@@ -81,6 +84,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen check --help =====
 baumkuchen check — say what is wrong with the posts
 
@@ -95,6 +99,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen init --help =====
 baumkuchen init — write the settings file for a new site
 
@@ -108,6 +113,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen version --help =====
 baumkuchen version — say which build this is
 
@@ -120,6 +126,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 ===== baumkuchen help --help =====
 baumkuchen — a blog that carries the same idea at up to five lengths
 
@@ -145,6 +152,7 @@ Global flags:
   --config PATH          the settings file to read
   -q, --quiet            say nothing but the result
   -h, --help             show this help and stop
+  -V, --version          say which build this is
 
 The folder is the one with the markdown in it. It may come before or after
 the flags. A folder whose name is the name of a command is written with a

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"io"
 	"io/fs"
 	"net/http"
@@ -72,7 +71,6 @@ func TestReadArgs(t *testing.T) {
 		{name: "the removed export flag", argv: []string{"-export", "out"}, wantErr: "is gone"},
 		{name: "the removed bundle flag", argv: []string{"-bundle", "out"}, wantErr: "is gone"},
 		{name: "the removed posts flag", argv: []string{"-posts", "~/blog"}, wantErr: "is gone"},
-		{name: "the removed version flag", argv: []string{"-version"}, wantErr: "is gone"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -99,7 +97,7 @@ func TestReadArgs(t *testing.T) {
 				t.Errorf("the folder is %q, want %q", cmd.folder, c.folder)
 			}
 			if c.out != "" {
-				got, ok := cmd.value("out")
+				got, ok := cmd.text("out")
 				if !ok {
 					t.Fatal("the out flag was not given")
 				}
@@ -114,10 +112,9 @@ func TestReadArgs(t *testing.T) {
 // The removed flags say what to write instead, and stop with the second code.
 func TestRemovedFlagsSayWhatToWrite(t *testing.T) {
 	cases := map[string]string{
-		"export":  "baumkuchen build -o DIR",
-		"bundle":  "baumkuchen bundle -o FILE",
-		"posts":   "baumkuchen serve FOLDER",
-		"version": "baumkuchen version",
+		"export": "baumkuchen build -o DIR",
+		"bundle": "baumkuchen bundle -o FILE",
+		"posts":  "baumkuchen serve FOLDER",
 	}
 	for name, hint := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -148,7 +145,6 @@ func TestRunExitCodes(t *testing.T) {
 		{name: "the removed export flag", argv: []string{"-export", "out"}, want: 2},
 		{name: "the removed posts flag", argv: []string{"-posts", "~/blog"}, want: 2},
 		{name: "the removed bundle flag", argv: []string{"-bundle", "x"}, want: 2},
-		{name: "the removed version flag", argv: []string{"-version"}, want: 2},
 		{name: "a folder named like a command", argv: []string{"serve", "build"}, want: 2},
 		{name: "a bundle with nowhere to write", argv: []string{"bundle"}, want: 2},
 		{name: "the version", argv: []string{"version"}, want: 0},
@@ -167,6 +163,242 @@ func TestRunExitCodes(t *testing.T) {
 					got, c.want, stderr.String())
 			}
 		})
+	}
+}
+
+// The version is asked for with a flag as well as with a command: almost
+// every program takes --version, and a script that calls it expects to be
+// answered.
+func TestTheVersionIsAskedForWithAFlagToo(t *testing.T) {
+	// act
+	var withFlag, withCommand, stderr bytes.Buffer
+	flagCode := run([]string{"--version"}, &withFlag, &stderr)
+	commandCode := run([]string{"version"}, &withCommand, &stderr)
+
+	// assert
+	if flagCode != 0 {
+		t.Errorf("the code of --version is %d, want 0 (the error stream said: %s)",
+			flagCode, stderr.String())
+	}
+	if commandCode != 0 {
+		t.Errorf("the code of the version command is %d, want 0 (the error stream said: %s)",
+			commandCode, stderr.String())
+	}
+	if withFlag.String() != withCommand.String() {
+		t.Errorf("--version says %q, and the version command says %q",
+			withFlag.String(), withCommand.String())
+	}
+	if !strings.Contains(withFlag.String(), "baumkuchen") {
+		t.Errorf("the version says nothing about the program: %q", withFlag.String())
+	}
+
+	// and the short form of the flag says the same
+	var short bytes.Buffer
+	if code := run([]string{"-V"}, &short, &stderr); code != 0 {
+		t.Errorf("the code of -V is %d, want 0", code)
+	}
+	if short.String() != withCommand.String() {
+		t.Errorf("-V says %q, and the version command says %q",
+			short.String(), withCommand.String())
+	}
+}
+
+// The short flags may be written together, as in -qh. Only the last one of
+// them can take a value, so the value of a group is written after it.
+func TestGroupedShortFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		argv    []string
+		quiet   bool
+		help    bool
+		out     string
+		wantErr string
+	}{
+		{name: "two flags together", argv: []string{"-qh"}, quiet: true, help: true},
+		{name: "a flag that takes a value", argv: []string{"build", "-qo", "out"},
+			quiet: true, out: "out"},
+		{name: "a letter that is not a flag", argv: []string{"-qx"}, wantErr: "unknown flag -x"},
+		{name: "a value in the middle of a group", argv: []string{"-oq", "out"},
+			wantErr: "only the last flag"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// act
+			cmd, err := readArgs(c.argv)
+
+			// assert
+			if c.wantErr != "" {
+				if err == nil {
+					t.Fatalf("no error, want one about %q", c.wantErr)
+				}
+				if !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("the error is %q, want it to mention %q", err, c.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.quiet && !cmd.bool("quiet") {
+				t.Error("the quiet flag was not read")
+			}
+			if c.help && !cmd.bool("help") {
+				t.Error("the help flag was not read")
+			}
+			if c.out != "" {
+				got, ok := cmd.text("out")
+				if !ok {
+					t.Fatal("the out flag was not given")
+				}
+				if got != c.out {
+					t.Errorf("out = %q, want %q", got, c.out)
+				}
+			}
+		})
+	}
+}
+
+// A word that is nearly a command, or nearly a flag, is named: the program
+// says what the writer meant, and not only what is wrong.
+func TestTheProgramSaysTheWordYouMeant(t *testing.T) {
+	cases := []struct {
+		name string
+		argv []string
+		want string
+	}{
+		{name: "a command that is nearly right", argv: []string{"biuld"},
+			want: "did you mean `build`?"},
+		{name: "a flag that is nearly right", argv: []string{"serve", "--drfats"},
+			want: "did you mean `--drafts`?"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// act
+			var stdout, stderr bytes.Buffer
+			code := run(c.argv, &stdout, &stderr)
+
+			// assert
+			if code != 2 {
+				t.Fatalf("the code is %d, want 2 (the error stream said: %s)",
+					code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), c.want) {
+				t.Errorf("the message does not say %q: %q", c.want, stderr.String())
+			}
+		})
+	}
+}
+
+// A word that names a folder is a folder, and not a word that was mistyped:
+// the program uses it, and it says nothing about any other command.
+func TestAFolderThatIsNearlyACommandIsStillAFolder(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "buld"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	// act
+	cmd, err := readArgs([]string{"buld"})
+
+	// assert
+	if err != nil {
+		t.Fatalf("the folder was not read: %v", err)
+	}
+	if cmd.folder != "buld" {
+		t.Errorf("the folder is %q, want %q", cmd.folder, "buld")
+	}
+}
+
+// Every command in the list has work to do, and the help is built from the
+// same list: a command that is in the list is in the help.
+func TestEveryCommandHasItsWorkAndItsPlaceInTheHelp(t *testing.T) {
+	// act
+	text := programUsage()
+
+	// assert
+	for _, c := range commandList() {
+		if c.run == nil {
+			t.Errorf("the command %s has no work to do", c.name)
+		}
+		if !strings.Contains(text, c.name) {
+			t.Errorf("the help does not mention %s:\n%s", c.name, text)
+		}
+	}
+}
+
+// The values of the flags are kept in one place, by the long name of the
+// flag, and a switch that was given as false is off.
+func TestTheValuesOfTheFlagsAreInOnePlace(t *testing.T) {
+	// act
+	cmd, err := readArgs([]string{"build", "-o", "out", "--clean", "--drafts=false"})
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := cmd.text("out")
+	if !ok {
+		t.Fatal("the out flag was not given")
+	}
+	if got != "out" {
+		t.Errorf("out = %q, want %q", got, "out")
+	}
+	if !cmd.bool("clean") {
+		t.Error("the clean flag was not read")
+	}
+	if cmd.bool("drafts") {
+		t.Error("--drafts=false must be off")
+	}
+	if _, ok := cmd.text("quiet"); ok {
+		t.Error("a flag that was not given must not be in the values")
+	}
+}
+
+// A switch takes true or false, and a value that is neither of them is a
+// mistake on the command line.
+func TestABadValueForASwitchIsAUsageError(t *testing.T) {
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"serve", "--open=maybe"}, &stdout, &stderr)
+
+	// assert
+	if code != 2 {
+		t.Errorf("the code is %d, want 2 (the error stream said: %s)",
+			code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "not true or false") {
+		t.Errorf("the message does not say what is wrong: %q", stderr.String())
+	}
+}
+
+// The quiet flag hides the lines that say what is happening, and not the
+// lines that say what is wrong: two files that want the same address are
+// said even when the program is quiet.
+func TestAWarningIsSaidEvenWhenTheProgramIsQuiet(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "one.md"),
+		"---\ndate: 2026-01-02\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	write(t, filepath.Join(dir, "sub", "one.md"),
+		"---\ndate: 2026-01-02\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	t.Chdir(t.TempDir())
+
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"check", dir, "-q"}, &stdout, &stderr)
+
+	// assert
+	if !strings.Contains(stderr.String(), "two files want /post/one") {
+		t.Errorf("the warning was not said: %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "the posts come from") {
+		t.Errorf("the progress was said even though the program is quiet: %q", stderr.String())
+	}
+	if code != 1 {
+		t.Errorf("the code is %d, want 1: the two files are an error in the report",
+			code)
 	}
 }
 
@@ -331,7 +563,7 @@ func TestTheProgramDoesNotGuessTheFolder(t *testing.T) {
 	t.Chdir(dir)
 
 	// act
-	plain := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	plain := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}}
 	templates, _, err := plain.files()
 
 	// assert
@@ -347,7 +579,7 @@ func TestTheProgramDoesNotGuessTheFolder(t *testing.T) {
 	}
 
 	// and with --dev they are the ones on disk
-	dev := &work{cmd: &commandLine{name: "serve", given: map[string]bool{"dev": true}}}
+	dev := &work{cmd: &commandLine{name: "serve", values: map[string]string{"dev": "true"}}}
 	templates, _, err = dev.files()
 	if err != nil {
 		t.Fatal(err)
@@ -370,10 +602,10 @@ func TestTheServerAlwaysWatchesTheWriting(t *testing.T) {
 		cmd  *commandLine
 		want bool
 	}{
-		{"serve", &commandLine{name: "serve", given: map[string]bool{}}, true},
-		{"serve with --dev", &commandLine{name: "serve", given: map[string]bool{"dev": true}}, true},
-		{"build", &commandLine{name: "build", given: map[string]bool{}}, false},
-		{"check", &commandLine{name: "check", given: map[string]bool{}}, false},
+		{"serve", &commandLine{name: "serve", values: map[string]string{}}, true},
+		{"serve with --dev", &commandLine{name: "serve", values: map[string]string{"dev": "true"}}, true},
+		{"build", &commandLine{name: "build", values: map[string]string{}}, false},
+		{"check", &commandLine{name: "check", values: map[string]string{}}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -397,7 +629,7 @@ func TestTheServerTellsTheBrowserWhenTheWritingChanges(t *testing.T) {
 	posts := filepath.Join(dir, "posts")
 	write(t, filepath.Join(posts, "one.md"),
 		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
-	w := &work{cmd: &commandLine{name: "serve", folder: posts, given: map[string]bool{}}}
+	w := &work{cmd: &commandLine{name: "serve", folder: posts, values: map[string]string{}}}
 	site, err := w.site(false)
 	if err != nil {
 		t.Fatal(err)
@@ -547,7 +779,7 @@ func TestThePostsComeFromTheRightPlace(t *testing.T) {
 
 	// act + assert
 	// the folder named on the command line comes first
-	named := &work{cmd: &commandLine{name: "serve", folder: dir, given: map[string]bool{}}}
+	named := &work{cmd: &commandLine{name: "serve", folder: dir, values: map[string]string{}}}
 	src, err := named.source(set)
 	if err != nil {
 		t.Fatal(err)
@@ -557,7 +789,7 @@ func TestThePostsComeFromTheRightPlace(t *testing.T) {
 	}
 
 	// then the one in the settings
-	fromFile := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	fromFile := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}}
 	src, err = fromFile.source(set)
 	if err != nil {
 		t.Fatal(err)
@@ -568,7 +800,7 @@ func TestThePostsComeFromTheRightPlace(t *testing.T) {
 
 	// then the environment, when the folder was not named
 	t.Setenv("BAUMKUCHEN_POSTS", other)
-	fromEnv := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	fromEnv := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}}
 	src, err = fromEnv.source(set)
 	if err != nil {
 		t.Fatal(err)
@@ -580,13 +812,13 @@ func TestThePostsComeFromTheRightPlace(t *testing.T) {
 
 	// a folder that is not there is an error, and says which one
 	missing := &work{cmd: &commandLine{name: "serve",
-		folder: filepath.Join(dir, "no-such-folder"), given: map[string]bool{}}}
+		folder: filepath.Join(dir, "no-such-folder"), values: map[string]string{}}}
 	if _, err := missing.source(set); err == nil {
 		t.Error("a folder that is not there must give an error")
 	}
 
 	// and a program with no posts at all says so
-	none := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+	none := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}}
 	if _, err := none.source(&settings{file: blog.File{}, dir: "."}); err == nil {
 		t.Error("no posts at all must give an error")
 	}
@@ -599,16 +831,12 @@ func TestTheBuildFolder(t *testing.T) {
 	set := &settings{file: blog.File{Dist: "dist"}, dir: "/tmp/site"}
 
 	// act + assert
-	w := &work{cmd: &commandLine{name: "build", given: map[string]bool{}}}
+	w := &work{cmd: &commandLine{name: "build", values: map[string]string{}}}
 	if got := w.outFolder(set); got != filepath.Join("/tmp/site", "dist") {
 		t.Errorf("the site goes to %q, want the one in the settings", got)
 	}
-	named := &work{cmd: &commandLine{name: "build", given: map[string]bool{"out": true}}}
-	named.cmd.flags = flag.NewFlagSet("build", flag.ContinueOnError)
-	named.cmd.flags.String("out", "", "")
-	if err := named.cmd.flags.Set("out", "out"); err != nil {
-		t.Fatal(err)
-	}
+	named := &work{cmd: &commandLine{name: "build",
+		values: map[string]string{"out": "out"}}}
 	if got := named.outFolder(set); got != "out" {
 		t.Errorf("the site goes to %q, want the one that was named", got)
 	}
@@ -677,7 +905,7 @@ func TestDraftsFollowTheAddress(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.addr, func(t *testing.T) {
-			w := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}}
+			w := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}}
 			if got := w.drafts(c.addr); got != c.want {
 				t.Errorf("drafts on %s = %v, want %v", c.addr, got, c.want)
 			}
@@ -685,11 +913,11 @@ func TestDraftsFollowTheAddress(t *testing.T) {
 	}
 
 	// the flags say so either way
-	w := &work{cmd: &commandLine{name: "serve", given: map[string]bool{"drafts": true}}}
+	w := &work{cmd: &commandLine{name: "serve", values: map[string]string{"drafts": "true"}}}
 	if !w.drafts("0.0.0.0:8080") {
 		t.Error("--drafts must show the drafts anywhere")
 	}
-	w = &work{cmd: &commandLine{name: "serve", given: map[string]bool{"no-drafts": true}}}
+	w = &work{cmd: &commandLine{name: "serve", values: map[string]string{"no-drafts": "true"}}}
 	if w.drafts("127.0.0.1:8080") {
 		t.Error("--no-drafts must hide the drafts even on the loopback address")
 	}

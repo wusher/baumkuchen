@@ -30,6 +30,9 @@ type Store struct {
 	incomplete []*Post
 	bySlug     map[string]*Post
 	stamp      string
+	// warn says what is wrong with the writing. A store that was made
+	// without a logger says nothing.
+	warn *log.Logger
 	// duplicates holds the slugs two files both want. The first one keeps
 	// the slug, and the other is named here rather than lost.
 	duplicates []Duplicate
@@ -137,7 +140,7 @@ func (s *Store) Refresh() error {
 		if first, taken := bySlug[p.Slug]; taken {
 			// two files of the same name in different folders would answer at
 			// one URL; the first one keeps it, and the other is named here
-			log.Printf("two files want /post/%s: %s and %s", p.Slug, first.File, p.File)
+			s.warnf("two files want /post/%s: %s and %s", p.Slug, first.File, p.File)
 			duplicates = append(duplicates, Duplicate{Slug: p.Slug, First: first.File, Second: p.File})
 			continue
 		}
@@ -159,6 +162,16 @@ func (s *Store) Refresh() error {
 	s.duplicates = duplicates
 	s.mu.Unlock()
 	return nil
+}
+
+// warnf says what is wrong with the writing.
+//
+// A store that was made without a logger says nothing at all.
+func (s *Store) warnf(format string, args ...any) {
+	if s.warn == nil {
+		return
+	}
+	s.warn.Printf(format, args...)
 }
 
 // Duplicates gives the slugs two files both want, so the check can say so.

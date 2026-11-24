@@ -111,7 +111,7 @@ func TestAFlagGivenAsFalseIsOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cmd.on("open") {
+	if cmd.bool("open") {
 		t.Error("--open=false must leave the browser shut")
 	}
 
@@ -120,7 +120,7 @@ func TestAFlagGivenAsFalseIsOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cmd.on("open") {
+	if !cmd.bool("open") {
 		t.Error("--open must open the browser")
 	}
 }

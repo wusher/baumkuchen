@@ -34,6 +34,12 @@ type work struct {
 	set *settings
 	// bundled is the content carried inside the program, when it carries any.
 	bundled fs.FS
+	// info says what is happening, as the program goes along. The quiet flag
+	// hides it.
+	info *log.Logger
+	// warning says what is wrong. It is never hidden: a warning is a thing
+	// the writer has to know.
+	warning *log.Logger
 }
 
 // dispatch reads the command line and does what it asks.
@@ -47,25 +53,20 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 	if cmd.name == "help" {
 		return w.help()
 	}
-	if cmd.globals.help {
+	if cmd.bool("help") {
 		fmt.Fprint(stdout, usageText(cmd.name, cmd.named))
 		return nil
 	}
-	switch cmd.name {
-	case "serve":
-		return w.serve()
-	case "build":
-		return w.build()
-	case "bundle":
-		return w.bundle()
-	case "check":
-		return w.check()
-	case "init":
-		return w.init()
-	case "version":
+	// the version is asked for with a flag as well as with a command, so a
+	// script can ask for it without knowing the commands
+	if cmd.bool("version") {
 		return w.version()
 	}
-	return usagef("unknown command %s", cmd.name)
+	c, ok := commandByName(cmd.name)
+	if !ok {
+		return usagef("unknown command %s", cmd.name)
+	}
+	return c.run(w)
 }
 
 // help shows the help: the whole program, or the help of one command.
@@ -84,13 +85,39 @@ func (w *work) help() error {
 // setupLog sends the log to the error stream, where it belongs.
 //
 // The result of a command goes to the standard output, so a pipe gets the
-// result and nothing else. The quiet flag says nothing at all but the result.
+// result and nothing else. The quiet flag hides the lines that say what is
+// happening, and not the lines that say what is wrong: a warning is a thing
+// the writer has to know.
 func (w *work) setupLog() {
-	log.SetOutput(w.err)
-	log.SetFlags(0)
-	if w.cmd.globals.quiet {
-		log.SetOutput(io.Discard)
+	err := w.err
+	if err == nil {
+		err = io.Discard
 	}
+	info := io.Writer(err)
+	if w.cmd.bool("quiet") {
+		info = io.Discard
+	}
+	w.info = log.New(info, "", 0)
+	w.warning = log.New(err, "", 0)
+}
+
+// say says what is happening, as the program goes along.
+//
+// The quiet flag hides it, and a work that was made without a logger says
+// nothing at all.
+func (w *work) say(format string, args ...any) {
+	if w.info == nil {
+		return
+	}
+	w.info.Printf(format, args...)
+}
+
+// warn says what is wrong. It is never hidden.
+func (w *work) warn(format string, args ...any) {
+	if w.warning == nil {
+		return
+	}
+	w.warning.Printf(format, args...)
 }
 
 // settings reads the settings for the run, with the flags on top of them.
@@ -102,12 +129,13 @@ func (w *work) settings() (*settings, error) {
 	if err != nil {
 		return nil, err
 	}
-	set, err := findSettings(w.cmd.globals.config, w.cmd.folder, bundled)
+	config, _ := w.cmd.text("config")
+	set, err := findSettings(config, w.cmd.folder, bundled)
 	if err != nil {
 		return nil, err
 	}
 	for _, name := range []string{"title", "heading", "favicon", "base"} {
-		if v, ok := w.cmd.value(name); ok {
+		if v, ok := w.cmd.text(name); ok {
 			set.file.Set(name, v)
 		}
 	}
@@ -239,8 +267,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("the settings come from %s", set.from)
-	log.Printf("the posts come from %s", src.Label())
+	w.say("the settings come from %s", set.from)
+	w.say("the posts come from %s", src.Label())
 	return blog.New(blog.Config{
 		Content:       src,
 		Templates:     templateFS,
@@ -254,6 +282,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 		DevFiles:      w.dev(),
 		HideDrafts:    !drafts,
 		DevErrors:     w.dev(),
+		Info:          w.info,
+		Warn:          w.warning,
 	})
 }
 
@@ -284,12 +314,12 @@ func (w *work) files() (templates, static fs.FS, err error) {
 func (w *work) watching() bool { return w.cmd.name == "serve" }
 
 // dev says whether the development mode was asked for.
-func (w *work) dev() bool { return w.cmd.was("dev") }
+func (w *work) dev() bool { return w.cmd.bool("dev") }
 
 // addr gives the address the server listens on: the flag, then the settings,
 // then the default in the code.
 func (w *work) addr(set *settings) string {
-	if v, ok := w.cmd.value("addr"); ok {
+	if v, ok := w.cmd.text("addr"); ok {
 		return v
 	}
 	if set.file.Addr != "" {
@@ -301,7 +331,7 @@ func (w *work) addr(set *settings) string {
 // outFolder gives the folder the built site is written into: the flag, then
 // the settings, then the default in the code.
 func (w *work) outFolder(set *settings) string {
-	if v, ok := w.cmd.value("out"); ok {
+	if v, ok := w.cmd.text("out"); ok {
 		return v
 	}
 	if set.file.Dist != "" {
@@ -329,9 +359,9 @@ func (w *work) serve() error {
 	}
 	published, draftCount, incomplete := site.Counts()
 	for _, p := range site.Incomplete() {
-		log.Printf("no depth %-28s missing: %s", p.Slug, strings.Join(p.Missing, ", "))
+		w.warn("no depth %-28s missing: %s", p.Slug, strings.Join(p.Missing, ", "))
 	}
-	log.Printf("%d published, %d draft(s), %d without a depth",
+	w.say("%d published, %d draft(s), %d without a depth",
 		published, draftCount, incomplete)
 
 	// the socket is opened before anything is said, so the address that is
@@ -343,9 +373,9 @@ func (w *work) serve() error {
 	defer ln.Close()
 	url := siteURL(ln.Addr())
 	fmt.Fprintf(w.out, "the blog is on %s\n", url)
-	if w.cmd.on("open") {
+	if w.cmd.bool("open") {
 		if err := openInBrowser(url); err != nil {
-			log.Printf("open a browser: %v", err)
+			w.warn("open a browser: %v", err)
 		}
 	}
 	return site.ServeOn(ln)
@@ -386,10 +416,10 @@ func isNumber(word string) bool {
 // they are held back anywhere else, where anyone can. The --drafts and
 // --no-drafts flags say so either way.
 func (w *work) drafts(addr string) bool {
-	if w.cmd.was("drafts") {
+	if w.cmd.bool("drafts") {
 		return true
 	}
-	if w.cmd.was("no-drafts") {
+	if w.cmd.bool("no-drafts") {
 		return false
 	}
 	return loopback(addr)
@@ -483,12 +513,12 @@ func (w *work) build() error {
 			return err
 		}
 	}
-	drafts := w.cmd.was("drafts")
+	drafts := w.cmd.bool("drafts")
 	site, err := w.site(drafts)
 	if err != nil {
 		return err
 	}
-	if w.cmd.was("clean") {
+	if w.cmd.bool("clean") {
 		if err := blog.CleanBuild(out); err != nil {
 			return err
 		}
@@ -506,7 +536,7 @@ func (w *work) build() error {
 
 // bundle writes one file with the program and the posts inside it.
 func (w *work) bundle() error {
-	out, _ := w.cmd.value("out")
+	out, _ := w.cmd.text("out")
 	if out == "" {
 		return usagef("bundle: say where to write it: --out FILE")
 	}
@@ -656,7 +686,7 @@ func (w *work) check() error {
 		return err
 	}
 	report := site.Check()
-	if w.cmd.was("json") {
+	if w.cmd.bool("json") {
 		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(report); err != nil {
@@ -668,7 +698,7 @@ func (w *work) check() error {
 	if report.Errors > 0 {
 		return errQuiet
 	}
-	if w.cmd.was("strict") && report.Warnings > 0 {
+	if w.cmd.bool("strict") && report.Warnings > 0 {
 		return errQuiet
 	}
 	return nil
@@ -694,7 +724,7 @@ func (w *work) init() error {
 		return err
 	}
 	path := filepath.Join(dir, settingsName)
-	if _, err := os.Stat(path); err == nil && !w.cmd.was("force") {
+	if _, err := os.Stat(path); err == nil && !w.cmd.bool("force") {
 		return fmt.Errorf("%s is already there: give --force to write over it", path)
 	}
 	if err := os.WriteFile(path, []byte(starterSettings), 0o644); err != nil {

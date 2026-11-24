@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // Every route the site answers on, and the ones it refuses.
@@ -196,6 +199,9 @@ func TestTheBrowserIsToldWhenAPostChanges(t *testing.T) {
 	write(t, dir, "open.md",
 		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# Open\n\n# Sentence\n\n"+
 			"A line written after the server started.\n")
+	// the mark is held for a moment, so the store is given the time to look
+	// at the writing again
+	time.Sleep(VersionWindow + 20*time.Millisecond)
 	after := reloadVersions(t, site)
 
 	// assert
@@ -324,6 +330,41 @@ func reloadVersions(t *testing.T, site *Site) map[string]string {
 		t.Fatal(err)
 	}
 	return versions
+}
+
+// Ten requests for the reload mark inside a tenth of a second read the
+// writing once, and not once for every request.
+func TestTenReloadRequestsReadTheWritingOnce(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	src := &countingSource{Source: content.NewDir(dir)}
+	root := os.DirFS("../..")
+	site, err := New(Config{
+		Content: src, Templates: root, Static: root, LiveReload: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(site.routes())
+	defer srv.Close()
+	looks := src.looks
+	// the window is let pass, so that the first request reads the writing
+	time.Sleep(VersionWindow + 20*time.Millisecond)
+
+	// act
+	for i := 0; i < 10; i++ {
+		res, err := http.Get(srv.URL + "/__baumkuchen_reload")
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+	}
+
+	// assert
+	if got := src.looks - looks; got != 1 {
+		t.Errorf("the writing was read %d times for ten requests, want 1", got)
+	}
 }
 
 // What the command prints when it starts.

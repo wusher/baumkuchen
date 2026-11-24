@@ -14,9 +14,19 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/wusher/baumkuchen/internal/content"
 )
+
+// VersionWindow is how long the store keeps the mark of the writing without
+// reading the disk again.
+//
+// A browser asks for the mark every half second, and a page that is opened
+// asks for it as well. A burst of questions inside this window is answered
+// from the mark the store already holds, so the writing is looked at once and
+// not once for every question.
+const VersionWindow = 300 * time.Millisecond
 
 type Store struct {
 	src content.Source
@@ -30,6 +40,13 @@ type Store struct {
 	incomplete []*Post
 	bySlug     map[string]*Post
 	stamp      string
+	// markMu guards the mark of the writing and the time it was read.
+	markMu sync.Mutex
+	// mark is the mark of the writing as it was last read, and markSeen is
+	// when it was read. A question that comes inside VersionWindow is
+	// answered from these, and the disk is left alone.
+	mark     string
+	markSeen time.Time
 	// warn says what is wrong with the writing. A store that was made
 	// without a logger says nothing.
 	warn *log.Logger
@@ -106,8 +123,37 @@ func (s *Store) fingerprint() string {
 // The mark is about the files, not about what was read from them: a file
 // that was changed and cannot be read still changes the mark, because the
 // writer has to see what is wrong with it.
+//
+// The store keeps the mark and the time it was read. A question that comes
+// within VersionWindow of that time is answered from the mark it holds, so
+// that a burst of questions reads the disk once and not once for each of
+// them.
 func (s *Store) Version() string {
-	sum := sha256.Sum256([]byte(s.fingerprint()))
+	s.markMu.Lock()
+	defer s.markMu.Unlock()
+	if s.mark != "" && time.Since(s.markSeen) < VersionWindow {
+		return s.mark
+	}
+	s.mark = markOf(s.fingerprint())
+	s.markSeen = time.Now()
+	return s.mark
+}
+
+// remember keeps the mark of the writing, and the time it was read.
+//
+// The store has just read the disk, so it knows the mark of the writing as it
+// is now. A question that comes soon after is answered from this mark, and
+// the disk is not read again for nothing.
+func (s *Store) remember(print string) {
+	s.markMu.Lock()
+	s.mark = markOf(print)
+	s.markSeen = time.Now()
+	s.markMu.Unlock()
+}
+
+// markOf gives the mark of a fingerprint.
+func markOf(print string) string {
+	sum := sha256.Sum256([]byte(print))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -115,6 +161,8 @@ func (s *Store) Version() string {
 
 func (s *Store) Refresh() error {
 	fp := s.fingerprint()
+	// the disk was read, so the mark of the writing is known as it is now
+	s.remember(fp)
 	s.mu.RLock()
 	same := fp == s.stamp
 	s.mu.RUnlock()

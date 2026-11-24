@@ -614,6 +614,51 @@ func TestTheBuildFolder(t *testing.T) {
 	}
 }
 
+// An address with no port in it is a mistake the writer can fix in one step,
+// so it is named, and the two forms that work are given. The message comes
+// before the writing is read, so it is the first thing said.
+func TestABadAddressIsNamed(t *testing.T) {
+	cases := []struct {
+		name string
+		addr string
+	}{
+		{name: "a port without a host", addr: "8080"},
+		{name: "a host without a port", addr: "localhost"},
+		{name: "a port that is not a number", addr: ":port"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// arrange
+			dir := t.TempDir()
+			posts := filepath.Join(dir, "posts")
+			write(t, filepath.Join(posts, "one.md"),
+				"---\ndate: 2026-01-02\n---\n\n# One\n\n# Sentence\n\nA line.\n")
+			t.Chdir(t.TempDir())
+
+			// act
+			var stdout, stderr bytes.Buffer
+			code := run([]string{"serve", posts, "--addr", c.addr}, &stdout, &stderr)
+
+			// assert
+			if code != 2 {
+				t.Fatalf("the code is %d, want 2 (the error stream said: %s)",
+					code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), c.addr) {
+				t.Errorf("the message does not name the address: %q", stderr.String())
+			}
+			if !strings.Contains(stderr.String(), ":8080") {
+				t.Errorf("the message does not say what to write: %q", stderr.String())
+			}
+			// the writing was not read: the message comes first
+			if strings.Contains(stderr.String(), "the posts come from") {
+				t.Errorf("the writing was read before the address was looked at: %q",
+					stderr.String())
+			}
+		})
+	}
+}
+
 // The drafts are shown on the loopback address, and held back anywhere else.
 func TestDraftsFollowTheAddress(t *testing.T) {
 	// arrange

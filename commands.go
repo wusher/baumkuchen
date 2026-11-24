@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -316,6 +317,11 @@ func (w *work) serve() error {
 		return err
 	}
 	addr := w.addr(set)
+	// the address is looked at before the writing is read, so a mistake in it
+	// is the first thing the writer hears about
+	if err := checkAddr(addr); err != nil {
+		return err
+	}
 	drafts := w.drafts(addr)
 	site, err := w.site(drafts)
 	if err != nil {
@@ -343,6 +349,35 @@ func (w *work) serve() error {
 		}
 	}
 	return site.ServeOn(ln)
+}
+
+// checkAddr says whether the address can be listened on.
+//
+// An address without a port in it is a mistake the writer can fix in one
+// step, so it is named, and the two forms that work are given. A port that
+// is not a number is the same mistake in the other half of the address.
+//
+// The check is made before the socket is opened, so the message comes
+// before anything else is said about the site.
+func checkAddr(addr string) error {
+	_, port, err := net.SplitHostPort(addr)
+	if err == nil {
+		if _, perr := strconv.Atoi(port); perr != nil {
+			return usagef("the port in %s is not a number: use :8080 or 127.0.0.1:8080", addr)
+		}
+		return nil
+	}
+	if isNumber(addr) {
+		return usagef("the address %s has no port in it: use :%s or 127.0.0.1:%s",
+			addr, addr, addr)
+	}
+	return usagef("the address %s has no port in it: use :8080 or 127.0.0.1:8080", addr)
+}
+
+// isNumber says whether a word is a number.
+func isNumber(word string) bool {
+	_, err := strconv.Atoi(word)
+	return err == nil
 }
 
 // drafts says whether the drafts are shown.

@@ -420,12 +420,25 @@ func openInBrowser(url string) error {
 }
 
 // build writes the static site.
+//
+// The output folder and the writing folder are checked against each other
+// before anything is written or removed: the site and the writing are
+// different things, and a build must not put one inside the other.
 func (w *work) build() error {
 	set, err := w.settings()
 	if err != nil {
 		return err
 	}
 	out := w.outFolder(set)
+	posts, inside, err := w.postsFolder(set)
+	if err != nil {
+		return err
+	}
+	if !inside {
+		if err := checkBuildPaths(out, posts); err != nil {
+			return err
+		}
+	}
 	drafts := w.cmd.was("drafts")
 	site, err := w.site(drafts)
 	if err != nil {

@@ -72,7 +72,6 @@ func TestReadArgs(t *testing.T) {
 		{name: "the removed export flag", argv: []string{"-export", "out"}, wantErr: "is gone"},
 		{name: "the removed bundle flag", argv: []string{"-bundle", "out"}, wantErr: "is gone"},
 		{name: "the removed posts flag", argv: []string{"-posts", "~/blog"}, wantErr: "is gone"},
-		{name: "the removed version flag", argv: []string{"-version"}, wantErr: "is gone"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -114,10 +113,9 @@ func TestReadArgs(t *testing.T) {
 // The removed flags say what to write instead, and stop with the second code.
 func TestRemovedFlagsSayWhatToWrite(t *testing.T) {
 	cases := map[string]string{
-		"export":  "baumkuchen build -o DIR",
-		"bundle":  "baumkuchen bundle -o FILE",
-		"posts":   "baumkuchen serve FOLDER",
-		"version": "baumkuchen version",
+		"export": "baumkuchen build -o DIR",
+		"bundle": "baumkuchen bundle -o FILE",
+		"posts":  "baumkuchen serve FOLDER",
 	}
 	for name, hint := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -148,7 +146,6 @@ func TestRunExitCodes(t *testing.T) {
 		{name: "the removed export flag", argv: []string{"-export", "out"}, want: 2},
 		{name: "the removed posts flag", argv: []string{"-posts", "~/blog"}, want: 2},
 		{name: "the removed bundle flag", argv: []string{"-bundle", "x"}, want: 2},
-		{name: "the removed version flag", argv: []string{"-version"}, want: 2},
 		{name: "a folder named like a command", argv: []string{"serve", "build"}, want: 2},
 		{name: "a bundle with nowhere to write", argv: []string{"bundle"}, want: 2},
 		{name: "the version", argv: []string{"version"}, want: 0},
@@ -167,6 +164,43 @@ func TestRunExitCodes(t *testing.T) {
 					got, c.want, stderr.String())
 			}
 		})
+	}
+}
+
+// The version is asked for with a flag as well as with a command: almost
+// every program takes --version, and a script that calls it expects to be
+// answered.
+func TestTheVersionIsAskedForWithAFlagToo(t *testing.T) {
+	// act
+	var withFlag, withCommand, stderr bytes.Buffer
+	flagCode := run([]string{"--version"}, &withFlag, &stderr)
+	commandCode := run([]string{"version"}, &withCommand, &stderr)
+
+	// assert
+	if flagCode != 0 {
+		t.Errorf("the code of --version is %d, want 0 (the error stream said: %s)",
+			flagCode, stderr.String())
+	}
+	if commandCode != 0 {
+		t.Errorf("the code of the version command is %d, want 0 (the error stream said: %s)",
+			commandCode, stderr.String())
+	}
+	if withFlag.String() != withCommand.String() {
+		t.Errorf("--version says %q, and the version command says %q",
+			withFlag.String(), withCommand.String())
+	}
+	if !strings.Contains(withFlag.String(), "baumkuchen") {
+		t.Errorf("the version says nothing about the program: %q", withFlag.String())
+	}
+
+	// and the short form of the flag says the same
+	var short bytes.Buffer
+	if code := run([]string{"-V"}, &short, &stderr); code != 0 {
+		t.Errorf("the code of -V is %d, want 0", code)
+	}
+	if short.String() != withCommand.String() {
+		t.Errorf("-V says %q, and the version command says %q",
+			short.String(), withCommand.String())
 	}
 }
 

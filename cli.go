@@ -23,6 +23,7 @@ var globalFlags = []flagDef{
 	{name: "config", arg: true, word: "PATH", desc: "the settings file to read"},
 	{name: "quiet", short: "q", desc: "say nothing but the result"},
 	{name: "help", short: "h", desc: "show this help and stop"},
+	{name: "version", short: "V", desc: "say which build this is"},
 }
 
 // The flags the commands add.
@@ -68,10 +69,9 @@ const defaultCommand = "serve"
 
 // The flags that were taken away, and what to write instead.
 var removedFlags = map[string]string{
-	"export":  "baumkuchen build -o DIR",
-	"bundle":  "baumkuchen bundle -o FILE",
-	"posts":   "baumkuchen serve FOLDER",
-	"version": "baumkuchen version",
+	"export": "baumkuchen build -o DIR",
+	"bundle": "baumkuchen bundle -o FILE",
+	"posts":  "baumkuchen serve FOLDER",
 }
 
 // usageError is a mistake in the command line. The program says what to do
@@ -87,9 +87,10 @@ func usagef(format string, args ...any) error {
 
 // globals are the flags every command understands.
 type globals struct {
-	config string
-	quiet  bool
-	help   bool
+	config  string
+	quiet   bool
+	help    bool
+	version bool
 }
 
 // commandLine is the command line, read.
@@ -337,6 +338,8 @@ func (c *commandLine) setGlobal(name, value string) {
 		c.globals.quiet = value == "true"
 	case "help":
 		c.globals.help = value == "true"
+	case "version":
+		c.globals.version = value == "true"
 	}
 }
 

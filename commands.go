@@ -51,6 +51,11 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 		fmt.Fprint(stdout, usageText(cmd.name, cmd.named))
 		return nil
 	}
+	// the version is asked for with a flag as well as with a command, so a
+	// script can ask for it without knowing the commands
+	if cmd.globals.version {
+		return w.version()
+	}
 	switch cmd.name {
 	case "serve":
 		return w.serve()

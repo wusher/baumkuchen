@@ -312,6 +312,23 @@ func TestAFolderThatIsNearlyACommandIsStillAFolder(t *testing.T) {
 	}
 }
 
+// Every command in the list has work to do, and the help is built from the
+// same list: a command that is in the list is in the help.
+func TestEveryCommandHasItsWorkAndItsPlaceInTheHelp(t *testing.T) {
+	// act
+	text := programUsage()
+
+	// assert
+	for _, c := range commandList() {
+		if c.run == nil {
+			t.Errorf("the command %s has no work to do", c.name)
+		}
+		if !strings.Contains(text, c.name) {
+			t.Errorf("the help does not mention %s:\n%s", c.name, text)
+		}
+	}
+}
+
 // The settings come from the file that was named, then the one in the posts
 // folder, then the one inside the program, then the one in the working
 // folder, then the ones in the code.

@@ -56,21 +56,11 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 	if cmd.globals.version {
 		return w.version()
 	}
-	switch cmd.name {
-	case "serve":
-		return w.serve()
-	case "build":
-		return w.build()
-	case "bundle":
-		return w.bundle()
-	case "check":
-		return w.check()
-	case "init":
-		return w.init()
-	case "version":
-		return w.version()
+	c, ok := commandByName(cmd.name)
+	if !ok {
+		return usagef("unknown command %s", cmd.name)
 	}
-	return usagef("unknown command %s", cmd.name)
+	return c.run(w)
 }
 
 // help shows the help: the whole program, or the help of one command.

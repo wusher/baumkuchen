@@ -51,9 +51,9 @@ func nearCommand(word string) (string, bool) {
 		return "", false
 	}
 	best, distance := "", nearDistance+1
-	for _, name := range commandNames {
-		if d := editDistance(word, name); d < distance {
-			best, distance = name, d
+	for _, c := range commandList() {
+		if d := editDistance(word, c.name); d < distance {
+			best, distance = c.name, d
 		}
 	}
 	return best, best != ""

@@ -24,7 +24,15 @@ type settings struct {
 	from string
 	// bytes is the file as it was read, so that a bundle can carry it.
 	bytes []byte
+	// written holds the names the file wrote down. A setting that is not in
+	// it is only the default in the code, and a caller that needs to tell
+	// the two apart looks here.
+	written map[string]bool
 }
+
+// names says whether the settings file wrote this setting down, rather than
+// it standing at the default.
+func (s *settings) names(setting string) bool { return s.written[setting] }
 
 // resolve gives the path of a folder named in the settings file.
 //
@@ -75,20 +83,22 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 				return nil, fmt.Errorf("the settings inside the program: %w", err)
 			}
 			return &settings{
-				file:  file,
-				dir:   ".",
-				from:  "the settings inside the program",
-				bytes: raw,
+				file:    file,
+				dir:     ".",
+				from:    "the settings inside the program",
+				bytes:   raw,
+				written: blog.Written(raw),
 			}, nil
 		}
 	}
 	// the settings the program was made with are not read: a copy of it does
 	// not inherit the site it was built from
 	return &settings{
-		file:  blog.Defaults(),
-		dir:   ".",
-		from:  "the defaults in the program",
-		bytes: []byte(starterSettings),
+		file:    blog.Defaults(),
+		dir:     ".",
+		from:    "the defaults in the program",
+		bytes:   []byte(starterSettings),
+		written: map[string]bool{},
 	}, nil
 }
 
@@ -102,7 +112,13 @@ func readSettings(path, dir string) (*settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	return &settings{file: file, dir: dir, from: path, bytes: raw}, nil
+	return &settings{
+		file:    file,
+		dir:     dir,
+		from:    path,
+		bytes:   raw,
+		written: blog.Written(raw),
+	}, nil
 }
 
 // starterSettings is the settings file the init command writes, and the one
@@ -134,4 +150,34 @@ base:
 
 # where the server listens
 addr: 127.0.0.1:8080
+`
+
+// starterPost is the first post the init command writes, so that a new site
+// has something in it and the shape of a post is shown.
+const starterPost = `---
+date: 2026-01-01
+tag: hello
+---
+
+# Hello
+
+# Sentence
+
+One sentence is the whole of a post at this depth.
+
+# Paragraph
+
+A paragraph says the same thing at a little more length.
+
+# Short
+
+Three paragraphs carry the idea through, so a reader can stop at any of them.
+
+# Medium
+
+A page holds the whole of it, with the detail that belongs to it.
+
+# Long
+
+Three pages hold everything there is to say about it, and more besides.
 `

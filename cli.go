@@ -8,45 +8,46 @@ import (
 )
 
 // flagDef is one flag a command understands: its long name, its short name
-// when it has one, and whether it takes a value.
+// when it has one, whether it takes a value, and the word that names the
+// value in the help.
 type flagDef struct {
 	name  string
 	short string
 	arg   bool
+	word  string
 	desc  string
 }
 
 // The flags every command understands.
 var globalFlags = []flagDef{
-	{name: "config", arg: true, desc: "the settings file to read"},
+	{name: "config", arg: true, word: "PATH", desc: "the settings file to read"},
 	{name: "quiet", short: "q", desc: "say nothing but the result"},
-	{name: "verbose", short: "v", desc: "say more about what is going on"},
 	{name: "help", short: "h", desc: "show this help and stop"},
 }
 
 // The flags the commands add.
 var commandFlags = map[string][]flagDef{
 	"serve": {
-		{name: "addr", arg: true, desc: "the address to listen on"},
+		{name: "addr", arg: true, word: "ADDR", desc: "the address to listen on"},
 		{name: "open", desc: "open the site in a browser"},
 		{name: "drafts", desc: "show the drafts, wherever it listens"},
 		{name: "no-drafts", desc: "hide the drafts, even on the loopback address"},
 		{name: "dev", desc: "read the templates and the stylesheet from disk, and show every error"},
-		{name: "title", arg: true, desc: "the name of the site"},
-		{name: "heading", arg: true, desc: "the line under the wordmark"},
-		{name: "favicon", arg: true, desc: "the picture on the tab"},
+		{name: "title", arg: true, word: "TEXT", desc: "the name of the site"},
+		{name: "heading", arg: true, word: "TEXT", desc: "the line under the wordmark"},
+		{name: "favicon", arg: true, word: "PATH", desc: "the picture on the tab"},
 	},
 	"build": {
-		{name: "out", short: "o", arg: true, desc: "the folder to write the site into"},
-		{name: "base", arg: true, desc: "the folder the site is published in"},
+		{name: "out", short: "o", arg: true, word: "DIR", desc: "the folder to write the site into"},
+		{name: "base", arg: true, word: "PATH", desc: "the folder the site is published in"},
 		{name: "clean", desc: "remove the files of an earlier build first"},
 		{name: "drafts", desc: "put the drafts in the built site"},
-		{name: "title", arg: true, desc: "the name of the site"},
-		{name: "heading", arg: true, desc: "the line under the wordmark"},
-		{name: "favicon", arg: true, desc: "the picture on the tab"},
+		{name: "title", arg: true, word: "TEXT", desc: "the name of the site"},
+		{name: "heading", arg: true, word: "TEXT", desc: "the line under the wordmark"},
+		{name: "favicon", arg: true, word: "PATH", desc: "the picture on the tab"},
 	},
 	"bundle": {
-		{name: "out", short: "o", arg: true, desc: "the file to write"},
+		{name: "out", short: "o", arg: true, word: "FILE", desc: "the file to write"},
 	},
 	"check": {
 		{name: "json", desc: "give the report as JSON"},
@@ -56,10 +57,11 @@ var commandFlags = map[string][]flagDef{
 		{name: "force", desc: "write over a settings file that is already there"},
 	},
 	"version": {},
+	"help":    {},
 }
 
 // The commands, in the order the help shows them.
-var commandNames = []string{"serve", "build", "bundle", "check", "init", "version"}
+var commandNames = []string{"serve", "build", "bundle", "check", "init", "version", "help"}
 
 // The command that runs when none is named.
 const defaultCommand = "serve"
@@ -85,10 +87,9 @@ func usagef(format string, args ...any) error {
 
 // globals are the flags every command understands.
 type globals struct {
-	config  string
-	quiet   bool
-	verbose bool
-	help    bool
+	config string
+	quiet  bool
+	help   bool
 }
 
 // commandLine is the command line, read.
@@ -101,6 +102,12 @@ type commandLine struct {
 	globals globals
 	flags   *flag.FlagSet
 	given   map[string]bool
+	// bools holds the yes-or-no flags of the command, as they were written.
+	// A flag given as --name=false is off, even though it was given.
+	bools map[string]bool
+	// subject is the command the help is about, when the help command was
+	// given the name of one.
+	subject string
 }
 
 // value gives the value of a flag of the command, and whether it was given.
@@ -117,6 +124,12 @@ func (c *commandLine) value(name string) (string, bool) {
 
 // was says whether a flag of the command was given.
 func (c *commandLine) was(name string) bool { return c.given[name] }
+
+// on says whether a flag of the command is on.
+//
+// A flag that was given as --name=false is off, even though it was given:
+// the writer asked for it to be off, and that is what is asked for.
+func (c *commandLine) on(name string) bool { return c.bools[name] }
 
 // isCommand says whether a word is the name of a command.
 func isCommand(word string) bool {
@@ -233,6 +246,12 @@ func readArgs(argv []string) (*commandLine, error) {
 		folder: folder,
 		flags:  newFlagSet(name),
 		given:  map[string]bool{},
+		bools:  map[string]bool{},
+	}
+	// the help command names the command its help is about, and that name
+	// is not a folder
+	if name == "help" {
+		cmd.subject, cmd.folder = cmd.folder, ""
 	}
 	for _, f := range flags {
 		def := table[f.name]
@@ -247,6 +266,14 @@ func readArgs(argv []string) (*commandLine, error) {
 			return nil, usagef("%s: %v", "--"+def.name, err)
 		}
 		cmd.given[def.name] = true
+		if !def.arg {
+			cmd.bools[def.name] = f.value == "true"
+		}
+	}
+	// the two flags that say the opposite of each other cannot both be
+	// given: the writer asked for two things at once.
+	if cmd.given["drafts"] && cmd.given["no-drafts"] {
+		return nil, usagef("--drafts and --no-drafts cannot be used together")
 	}
 	return cmd, nil
 }
@@ -258,6 +285,20 @@ func readCommand(words []string) (name, folder string, named bool, err error) {
 	if len(words) > 0 && isCommand(words[0]) {
 		name, named = words[0], true
 		rest = words[1:]
+	}
+	// the help command takes the name of a command, not a folder
+	if name == "help" {
+		if len(rest) > 1 {
+			return "", "", false, usagef("expected at most one command, got %d: %s",
+				len(rest), strings.Join(rest, " "))
+		}
+		if len(rest) == 1 {
+			if !isCommand(rest[0]) {
+				return "", "", false, usagef("unknown command %s", rest[0])
+			}
+			return name, rest[0], named, nil
+		}
+		return name, "", named, nil
 	}
 	if len(rest) > 1 {
 		return "", "", false, usagef("expected at most one folder, got %d: %s",
@@ -294,8 +335,6 @@ func (c *commandLine) setGlobal(name, value string) {
 		c.globals.config = value
 	case "quiet":
 		c.globals.quiet = value == "true"
-	case "verbose":
-		c.globals.verbose = value == "true"
 	case "help":
 		c.globals.help = value == "true"
 	}
@@ -306,6 +345,11 @@ func usageText(command string, named bool) string {
 	if named {
 		return commandUsage(command)
 	}
+	return programUsage()
+}
+
+// programUsage gives the help for the whole program.
+func programUsage() string {
 	var b strings.Builder
 	b.WriteString("baumkuchen — a blog that carries the same idea at up to five lengths\n\n")
 	b.WriteString("Usage:\n")
@@ -314,7 +358,8 @@ func usageText(command string, named bool) string {
 	b.WriteString("  baumkuchen bundle [folder] --out FILE\n")
 	b.WriteString("  baumkuchen check [folder] [flags]\n")
 	b.WriteString("  baumkuchen init [folder] [flags]\n")
-	b.WriteString("  baumkuchen version\n\n")
+	b.WriteString("  baumkuchen version\n")
+	b.WriteString("  baumkuchen help [command]\n\n")
 	b.WriteString("Commands:\n")
 	for _, name := range commandNames {
 		fmt.Fprintf(&b, "  %-8s %s\n", name, commandDescription(name))
@@ -346,6 +391,8 @@ func commandUsage(command string) string {
 		b.WriteString("  baumkuchen init [folder] [flags]\n")
 	case "version":
 		b.WriteString("  baumkuchen version\n")
+	case "help":
+		b.WriteString("  baumkuchen help [command]\n")
 	}
 	b.WriteString("\nFlags:\n")
 	b.WriteString(flagLines(commandFlags[command]))
@@ -369,6 +416,8 @@ func commandDescription(command string) string {
 		return "write the settings file for a new site"
 	case "version":
 		return "say which build this is"
+	case "help":
+		return "show this help and stop"
 	}
 	return ""
 }
@@ -382,7 +431,7 @@ func flagLines(defs []flagDef) string {
 			name = "-" + d.short + ", " + name
 		}
 		if d.arg {
-			name += " FILE"
+			name += " " + d.word
 		}
 		fmt.Fprintf(&b, "  %-22s %s\n", name, d.desc)
 	}

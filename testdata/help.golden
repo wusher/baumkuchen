@@ -1,0 +1,153 @@
+===== baumkuchen (no command) --help =====
+baumkuchen — a blog that carries the same idea at up to five lengths
+
+Usage:
+  baumkuchen [serve] [folder] [flags]
+  baumkuchen build [folder] [flags]
+  baumkuchen bundle [folder] --out FILE
+  baumkuchen check [folder] [flags]
+  baumkuchen init [folder] [flags]
+  baumkuchen version
+  baumkuchen help [command]
+
+Commands:
+  serve    serve the posts, live (the command that stands in for the others)
+  build    write the static site, then stop
+  bundle   write one file with the program and the posts inside it
+  check    say what is wrong with the posts
+  init     write the settings file for a new site
+  version  say which build this is
+  help     show this help and stop
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+
+The folder is the one with the markdown in it. It may come before or after
+the flags. A folder whose name is the name of a command is written with a
+path in front of it, as in ./build.
+
+Run "baumkuchen <command> --help" for the flags of one command.
+===== baumkuchen serve --help =====
+baumkuchen serve — serve the posts, live (the command that stands in for the others)
+
+Usage:
+  baumkuchen serve [folder] [flags]
+
+Flags:
+  --addr ADDR            the address to listen on
+  --open                 open the site in a browser
+  --drafts               show the drafts, wherever it listens
+  --no-drafts            hide the drafts, even on the loopback address
+  --dev                  read the templates and the stylesheet from disk, and show every error
+  --title TEXT           the name of the site
+  --heading TEXT         the line under the wordmark
+  --favicon PATH         the picture on the tab
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen build --help =====
+baumkuchen build — write the static site, then stop
+
+Usage:
+  baumkuchen build [folder] [flags]
+
+Flags:
+  -o, --out DIR          the folder to write the site into
+  --base PATH            the folder the site is published in
+  --clean                remove the files of an earlier build first
+  --drafts               put the drafts in the built site
+  --title TEXT           the name of the site
+  --heading TEXT         the line under the wordmark
+  --favicon PATH         the picture on the tab
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen bundle --help =====
+baumkuchen bundle — write one file with the program and the posts inside it
+
+Usage:
+  baumkuchen bundle [folder] --out FILE
+
+Flags:
+  -o, --out FILE         the file to write
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen check --help =====
+baumkuchen check — say what is wrong with the posts
+
+Usage:
+  baumkuchen check [folder] [flags]
+
+Flags:
+  --json                 give the report as JSON
+  --strict               stop with 1 when there is a warning
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen init --help =====
+baumkuchen init — write the settings file for a new site
+
+Usage:
+  baumkuchen init [folder] [flags]
+
+Flags:
+  --force                write over a settings file that is already there
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen version --help =====
+baumkuchen version — say which build this is
+
+Usage:
+  baumkuchen version
+
+Flags:
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+===== baumkuchen help --help =====
+baumkuchen — a blog that carries the same idea at up to five lengths
+
+Usage:
+  baumkuchen [serve] [folder] [flags]
+  baumkuchen build [folder] [flags]
+  baumkuchen bundle [folder] --out FILE
+  baumkuchen check [folder] [flags]
+  baumkuchen init [folder] [flags]
+  baumkuchen version
+  baumkuchen help [command]
+
+Commands:
+  serve    serve the posts, live (the command that stands in for the others)
+  build    write the static site, then stop
+  bundle   write one file with the program and the posts inside it
+  check    say what is wrong with the posts
+  init     write the settings file for a new site
+  version  say which build this is
+  help     show this help and stop
+
+Global flags:
+  --config PATH          the settings file to read
+  -q, --quiet            say nothing but the result
+  -h, --help             show this help and stop
+
+The folder is the one with the markdown in it. It may come before or after
+the flags. A folder whose name is the name of a command is written with a
+path in front of it, as in ./build.
+
+Run "baumkuchen <command> --help" for the flags of one command.

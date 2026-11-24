@@ -259,6 +259,59 @@ func TestGroupedShortFlags(t *testing.T) {
 	}
 }
 
+// A word that is nearly a command, or nearly a flag, is named: the program
+// says what the writer meant, and not only what is wrong.
+func TestTheProgramSaysTheWordYouMeant(t *testing.T) {
+	cases := []struct {
+		name string
+		argv []string
+		want string
+	}{
+		{name: "a command that is nearly right", argv: []string{"biuld"},
+			want: "did you mean `build`?"},
+		{name: "a flag that is nearly right", argv: []string{"serve", "--drfats"},
+			want: "did you mean `--drafts`?"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// act
+			var stdout, stderr bytes.Buffer
+			code := run(c.argv, &stdout, &stderr)
+
+			// assert
+			if code != 2 {
+				t.Fatalf("the code is %d, want 2 (the error stream said: %s)",
+					code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), c.want) {
+				t.Errorf("the message does not say %q: %q", c.want, stderr.String())
+			}
+		})
+	}
+}
+
+// A word that names a folder is a folder, and not a word that was mistyped:
+// the program uses it, and it says nothing about any other command.
+func TestAFolderThatIsNearlyACommandIsStillAFolder(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "buld"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+
+	// act
+	cmd, err := readArgs([]string{"buld"})
+
+	// assert
+	if err != nil {
+		t.Fatalf("the folder was not read: %v", err)
+	}
+	if cmd.folder != "buld" {
+		t.Errorf("the folder is %q, want %q", cmd.folder, "buld")
+	}
+}
+
 // The settings come from the file that was named, then the one in the posts
 // folder, then the one inside the program, then the one in the working
 // folder, then the ones in the code.

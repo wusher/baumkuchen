@@ -182,6 +182,14 @@ func belongsTo(def flagDef, command string) bool {
 	return false
 }
 
+// flagList gives the flags a command understands: the ones every command
+// understands, and the ones of that command.
+func flagList(command string) []flagDef {
+	out := make([]flagDef, 0, len(globalFlags)+len(commandFlags[command]))
+	out = append(out, globalFlags...)
+	return append(out, commandFlags[command]...)
+}
+
 // splitFlag takes a flag off the command line: its name, and the value that
 // came with it, if it came with one.
 func splitFlag(arg string) (name, value string, hasValue bool) {
@@ -227,7 +235,11 @@ func readArgs(argv []string) (*commandLine, error) {
 				// of them can take a value, so -qo out is the way to write
 				// it.
 				if strings.HasPrefix(arg, "--") || len(name) < 2 {
-					return nil, usagef("unknown flag %s", "--"+name)
+					// the flag is not known: it is named once the
+					// command is known, so that the hint can be
+					// about the flags of that command
+					flags = append(flags, given{name: name})
+					continue
 				}
 				for j := 0; j < len(name); j++ {
 					letter := string(name[j])
@@ -288,13 +300,17 @@ func readArgs(argv []string) (*commandLine, error) {
 		cmd.subject, cmd.folder = cmd.folder, ""
 	}
 	for _, f := range flags {
-		def := table[f.name]
+		def, known := table[f.name]
+		if !known {
+			return nil, usagef("unknown flag %s%s", "--"+f.name, flagHint(f.name, name))
+		}
 		if isGlobal(def) {
 			cmd.setGlobal(def.name, f.value)
 			continue
 		}
 		if !belongsTo(def, name) {
-			return nil, usagef("unknown flag %s for %s", "--"+def.name, name)
+			return nil, usagef("unknown flag %s for %s%s",
+				"--"+def.name, name, flagHint(def.name, name))
 		}
 		if err := cmd.flags.Set(def.name, f.value); err != nil {
 			return nil, usagef("%s: %v", "--"+def.name, err)
@@ -313,12 +329,22 @@ func readArgs(argv []string) (*commandLine, error) {
 }
 
 // readCommand says which command to run, and which folder was named.
+//
+// The first word is the command, unless it is the name of a folder. A word
+// that is close to the name of a command, and that no folder carries, is
+// most likely a command that was mistyped, and the command it was meant to
+// be is named.
 func readCommand(words []string) (name, folder string, named bool, err error) {
 	name = defaultCommand
 	rest := words
 	if len(words) > 0 && isCommand(words[0]) {
 		name, named = words[0], true
 		rest = words[1:]
+	} else if len(words) > 0 {
+		if near, ok := nearCommand(words[0]); ok && !folderExists(words[0]) {
+			return "", "", false, usagef("unknown command %s: did you mean `%s`?",
+				words[0], near)
+		}
 	}
 	// the help command takes the name of a command, not a folder
 	if name == "help" {

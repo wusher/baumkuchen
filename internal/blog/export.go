@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -149,7 +148,7 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 	// a site with no picture is not an error: there is nothing to copy, and
 	// the build is still a build, so it still leaves its list behind
 	if before > 0 {
-		log.Printf("%d picture(s), %d KB written of %d KB, %d%% saved",
+		s.say("%d picture(s), %d KB written of %d KB, %d%% saved",
 			pictures, after/1024, before/1024, 100-after*100/before)
 	}
 	if err := writeManifest(dir, written); err != nil {

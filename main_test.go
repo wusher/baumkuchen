@@ -373,6 +373,35 @@ func TestABadValueForASwitchIsAUsageError(t *testing.T) {
 	}
 }
 
+// The quiet flag hides the lines that say what is happening, and not the
+// lines that say what is wrong: two files that want the same address are
+// said even when the program is quiet.
+func TestAWarningIsSaidEvenWhenTheProgramIsQuiet(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "one.md"),
+		"---\ndate: 2026-01-02\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	write(t, filepath.Join(dir, "sub", "one.md"),
+		"---\ndate: 2026-01-02\n---\n\n# One\n\n# Sentence\n\nA line about it.\n")
+	t.Chdir(t.TempDir())
+
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"check", dir, "-q"}, &stdout, &stderr)
+
+	// assert
+	if !strings.Contains(stderr.String(), "two files want /post/one") {
+		t.Errorf("the warning was not said: %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "the posts come from") {
+		t.Errorf("the progress was said even though the program is quiet: %q", stderr.String())
+	}
+	if code != 1 {
+		t.Errorf("the code is %d, want 1: the two files are an error in the report",
+			code)
+	}
+}
+
 // The settings come from the file that was named, then the one in the posts
 // folder, then the one inside the program, then the one in the working
 // folder, then the ones in the code.

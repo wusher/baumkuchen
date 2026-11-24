@@ -34,6 +34,12 @@ type work struct {
 	set *settings
 	// bundled is the content carried inside the program, when it carries any.
 	bundled fs.FS
+	// info says what is happening, as the program goes along. The quiet flag
+	// hides it.
+	info *log.Logger
+	// warning says what is wrong. It is never hidden: a warning is a thing
+	// the writer has to know.
+	warning *log.Logger
 }
 
 // dispatch reads the command line and does what it asks.
@@ -79,13 +85,39 @@ func (w *work) help() error {
 // setupLog sends the log to the error stream, where it belongs.
 //
 // The result of a command goes to the standard output, so a pipe gets the
-// result and nothing else. The quiet flag says nothing at all but the result.
+// result and nothing else. The quiet flag hides the lines that say what is
+// happening, and not the lines that say what is wrong: a warning is a thing
+// the writer has to know.
 func (w *work) setupLog() {
-	log.SetOutput(w.err)
-	log.SetFlags(0)
-	if w.cmd.bool("quiet") {
-		log.SetOutput(io.Discard)
+	err := w.err
+	if err == nil {
+		err = io.Discard
 	}
+	info := io.Writer(err)
+	if w.cmd.bool("quiet") {
+		info = io.Discard
+	}
+	w.info = log.New(info, "", 0)
+	w.warning = log.New(err, "", 0)
+}
+
+// say says what is happening, as the program goes along.
+//
+// The quiet flag hides it, and a work that was made without a logger says
+// nothing at all.
+func (w *work) say(format string, args ...any) {
+	if w.info == nil {
+		return
+	}
+	w.info.Printf(format, args...)
+}
+
+// warn says what is wrong. It is never hidden.
+func (w *work) warn(format string, args ...any) {
+	if w.warning == nil {
+		return
+	}
+	w.warning.Printf(format, args...)
 }
 
 // settings reads the settings for the run, with the flags on top of them.
@@ -235,8 +267,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("the settings come from %s", set.from)
-	log.Printf("the posts come from %s", src.Label())
+	w.say("the settings come from %s", set.from)
+	w.say("the posts come from %s", src.Label())
 	return blog.New(blog.Config{
 		Content:       src,
 		Templates:     templateFS,
@@ -250,6 +282,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 		DevFiles:      w.dev(),
 		HideDrafts:    !drafts,
 		DevErrors:     w.dev(),
+		Info:          w.info,
+		Warn:          w.warning,
 	})
 }
 
@@ -325,9 +359,9 @@ func (w *work) serve() error {
 	}
 	published, draftCount, incomplete := site.Counts()
 	for _, p := range site.Incomplete() {
-		log.Printf("no depth %-28s missing: %s", p.Slug, strings.Join(p.Missing, ", "))
+		w.warn("no depth %-28s missing: %s", p.Slug, strings.Join(p.Missing, ", "))
 	}
-	log.Printf("%d published, %d draft(s), %d without a depth",
+	w.say("%d published, %d draft(s), %d without a depth",
 		published, draftCount, incomplete)
 
 	// the socket is opened before anything is said, so the address that is
@@ -341,7 +375,7 @@ func (w *work) serve() error {
 	fmt.Fprintf(w.out, "the blog is on %s\n", url)
 	if w.cmd.bool("open") {
 		if err := openInBrowser(url); err != nil {
-			log.Printf("open a browser: %v", err)
+			w.warn("open a browser: %v", err)
 		}
 	}
 	return site.ServeOn(ln)

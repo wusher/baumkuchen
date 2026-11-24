@@ -1,9 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"io"
+	"strconv"
 	"strings"
 )
 
@@ -147,52 +146,43 @@ func usagef(format string, args ...any) error {
 	return usageError{message: fmt.Sprintf(format, args...)}
 }
 
-// globals are the flags every command understands.
-type globals struct {
-	config  string
-	quiet   bool
-	help    bool
-	version bool
-}
-
 // commandLine is the command line, read.
 type commandLine struct {
 	name string
 	// named says whether the command was written out, rather than being the
 	// one that stands in for it.
-	named   bool
-	folder  string
-	globals globals
-	flags   *flag.FlagSet
-	given   map[string]bool
-	// bools holds the yes-or-no flags of the command, as they were written.
-	// A flag given as --name=false is off, even though it was given.
-	bools map[string]bool
+	named  bool
+	folder string
+	// values holds every flag that was given, by its long name. A flag that
+	// was not given is not in here, so the map says what was asked for and
+	// what was answered.
+	values map[string]string
 	// subject is the command the help is about, when the help command was
 	// given the name of one.
 	subject string
 }
 
-// value gives the value of a flag of the command, and whether it was given.
-func (c *commandLine) value(name string) (string, bool) {
-	if !c.given[name] {
-		return "", false
-	}
-	f := c.flags.Lookup(name)
-	if f == nil {
-		return "", false
-	}
-	return f.Value.String(), true
-}
-
-// was says whether a flag of the command was given.
-func (c *commandLine) was(name string) bool { return c.given[name] }
-
-// on says whether a flag of the command is on.
+// bool says whether a flag of the command is on.
 //
 // A flag that was given as --name=false is off, even though it was given:
 // the writer asked for it to be off, and that is what is asked for.
-func (c *commandLine) on(name string) bool { return c.bools[name] }
+func (c *commandLine) bool(name string) bool {
+	value, ok := c.values[name]
+	if !ok {
+		return false
+	}
+	on, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return on
+}
+
+// text gives the value of a flag of the command, and whether it was given.
+func (c *commandLine) text(name string) (string, bool) {
+	value, ok := c.values[name]
+	return value, ok
+}
 
 // isCommand says whether a word is the name of a command.
 func isCommand(word string) bool {
@@ -364,9 +354,7 @@ func readArgs(argv []string) (*commandLine, error) {
 		name:   name,
 		named:  named,
 		folder: folder,
-		flags:  newFlagSet(name),
-		given:  map[string]bool{},
-		bools:  map[string]bool{},
+		values: map[string]string{},
 	}
 	// the help command names the command its help is about, and that name
 	// is not a folder
@@ -378,25 +366,24 @@ func readArgs(argv []string) (*commandLine, error) {
 		if !known {
 			return nil, usagef("unknown flag %s%s", "--"+f.name, flagHint(f.name, name))
 		}
-		if isGlobal(def) {
-			cmd.setGlobal(def.name, f.value)
-			continue
-		}
-		if !belongsTo(def, name) {
+		if !isGlobal(def) && !belongsTo(def, name) {
 			return nil, usagef("unknown flag %s for %s%s",
 				"--"+def.name, name, flagHint(def.name, name))
 		}
-		if err := cmd.flags.Set(def.name, f.value); err != nil {
-			return nil, usagef("%s: %v", "--"+def.name, err)
-		}
-		cmd.given[def.name] = true
 		if !def.arg {
-			cmd.bools[def.name] = f.value == "true"
+			// a switch takes true or false, and a value that is neither
+			// of them is a mistake on the command line
+			if _, err := strconv.ParseBool(f.value); err != nil {
+				return nil, usagef("%s: %s is not true or false", "--"+def.name, f.value)
+			}
 		}
+		cmd.values[def.name] = f.value
 	}
 	// the two flags that say the opposite of each other cannot both be
 	// given: the writer asked for two things at once.
-	if cmd.given["drafts"] && cmd.given["no-drafts"] {
+	_, drafts := cmd.text("drafts")
+	_, noDrafts := cmd.text("no-drafts")
+	if drafts && noDrafts {
 		return nil, usagef("--drafts and --no-drafts cannot be used together")
 	}
 	return cmd, nil
@@ -446,38 +433,6 @@ func readCommand(words []string) (name, folder string, named bool, err error) {
 		}
 	}
 	return name, folder, named, nil
-}
-
-// newFlagSet makes the flags of a command.
-func newFlagSet(name string) *flag.FlagSet {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	c, ok := commandByName(name)
-	if !ok {
-		return fs
-	}
-	for _, d := range c.flags {
-		if d.arg {
-			fs.String(d.name, "", d.desc)
-		} else {
-			fs.Bool(d.name, false, d.desc)
-		}
-	}
-	return fs
-}
-
-// setGlobal puts a global flag where it belongs.
-func (c *commandLine) setGlobal(name, value string) {
-	switch name {
-	case "config":
-		c.globals.config = value
-	case "quiet":
-		c.globals.quiet = value == "true"
-	case "help":
-		c.globals.help = value == "true"
-	case "version":
-		c.globals.version = value == "true"
-	}
 }
 
 // usageText gives the help: the whole program, or one command.

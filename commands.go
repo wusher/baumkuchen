@@ -47,13 +47,13 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 	if cmd.name == "help" {
 		return w.help()
 	}
-	if cmd.globals.help {
+	if cmd.bool("help") {
 		fmt.Fprint(stdout, usageText(cmd.name, cmd.named))
 		return nil
 	}
 	// the version is asked for with a flag as well as with a command, so a
 	// script can ask for it without knowing the commands
-	if cmd.globals.version {
+	if cmd.bool("version") {
 		return w.version()
 	}
 	c, ok := commandByName(cmd.name)
@@ -83,7 +83,7 @@ func (w *work) help() error {
 func (w *work) setupLog() {
 	log.SetOutput(w.err)
 	log.SetFlags(0)
-	if w.cmd.globals.quiet {
+	if w.cmd.bool("quiet") {
 		log.SetOutput(io.Discard)
 	}
 }
@@ -97,12 +97,13 @@ func (w *work) settings() (*settings, error) {
 	if err != nil {
 		return nil, err
 	}
-	set, err := findSettings(w.cmd.globals.config, w.cmd.folder, bundled)
+	config, _ := w.cmd.text("config")
+	set, err := findSettings(config, w.cmd.folder, bundled)
 	if err != nil {
 		return nil, err
 	}
 	for _, name := range []string{"title", "heading", "favicon", "base"} {
-		if v, ok := w.cmd.value(name); ok {
+		if v, ok := w.cmd.text(name); ok {
 			set.file.Set(name, v)
 		}
 	}
@@ -279,12 +280,12 @@ func (w *work) files() (templates, static fs.FS, err error) {
 func (w *work) watching() bool { return w.cmd.name == "serve" }
 
 // dev says whether the development mode was asked for.
-func (w *work) dev() bool { return w.cmd.was("dev") }
+func (w *work) dev() bool { return w.cmd.bool("dev") }
 
 // addr gives the address the server listens on: the flag, then the settings,
 // then the default in the code.
 func (w *work) addr(set *settings) string {
-	if v, ok := w.cmd.value("addr"); ok {
+	if v, ok := w.cmd.text("addr"); ok {
 		return v
 	}
 	if set.file.Addr != "" {
@@ -296,7 +297,7 @@ func (w *work) addr(set *settings) string {
 // outFolder gives the folder the built site is written into: the flag, then
 // the settings, then the default in the code.
 func (w *work) outFolder(set *settings) string {
-	if v, ok := w.cmd.value("out"); ok {
+	if v, ok := w.cmd.text("out"); ok {
 		return v
 	}
 	if set.file.Dist != "" {
@@ -338,7 +339,7 @@ func (w *work) serve() error {
 	defer ln.Close()
 	url := siteURL(ln.Addr())
 	fmt.Fprintf(w.out, "the blog is on %s\n", url)
-	if w.cmd.on("open") {
+	if w.cmd.bool("open") {
 		if err := openInBrowser(url); err != nil {
 			log.Printf("open a browser: %v", err)
 		}
@@ -381,10 +382,10 @@ func isNumber(word string) bool {
 // they are held back anywhere else, where anyone can. The --drafts and
 // --no-drafts flags say so either way.
 func (w *work) drafts(addr string) bool {
-	if w.cmd.was("drafts") {
+	if w.cmd.bool("drafts") {
 		return true
 	}
-	if w.cmd.was("no-drafts") {
+	if w.cmd.bool("no-drafts") {
 		return false
 	}
 	return loopback(addr)
@@ -478,12 +479,12 @@ func (w *work) build() error {
 			return err
 		}
 	}
-	drafts := w.cmd.was("drafts")
+	drafts := w.cmd.bool("drafts")
 	site, err := w.site(drafts)
 	if err != nil {
 		return err
 	}
-	if w.cmd.was("clean") {
+	if w.cmd.bool("clean") {
 		if err := blog.CleanBuild(out); err != nil {
 			return err
 		}
@@ -501,7 +502,7 @@ func (w *work) build() error {
 
 // bundle writes one file with the program and the posts inside it.
 func (w *work) bundle() error {
-	out, _ := w.cmd.value("out")
+	out, _ := w.cmd.text("out")
 	if out == "" {
 		return usagef("bundle: say where to write it: --out FILE")
 	}
@@ -651,7 +652,7 @@ func (w *work) check() error {
 		return err
 	}
 	report := site.Check()
-	if w.cmd.was("json") {
+	if w.cmd.bool("json") {
 		enc := json.NewEncoder(w.out)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(report); err != nil {
@@ -663,7 +664,7 @@ func (w *work) check() error {
 	if report.Errors > 0 {
 		return errQuiet
 	}
-	if w.cmd.was("strict") && report.Warnings > 0 {
+	if w.cmd.bool("strict") && report.Warnings > 0 {
 		return errQuiet
 	}
 	return nil
@@ -689,7 +690,7 @@ func (w *work) init() error {
 		return err
 	}
 	path := filepath.Join(dir, settingsName)
-	if _, err := os.Stat(path); err == nil && !w.cmd.was("force") {
+	if _, err := os.Stat(path); err == nil && !w.cmd.bool("force") {
 		return fmt.Errorf("%s is already there: give --force to write over it", path)
 	}
 	if err := os.WriteFile(path, []byte(starterSettings), 0o644); err != nil {

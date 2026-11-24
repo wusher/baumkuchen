@@ -43,7 +43,7 @@ func TestAProgramReadsTheWritingItCarries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}, bundled: files}
+	w := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}, bundled: files}
 	src, err := w.source(set)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestTheLogSaysTheWritingIsInsideTheProgram(t *testing.T) {
 	t.Chdir(t.TempDir())
 	var logged bytes.Buffer
 	w := &work{
-		cmd:     &commandLine{name: "serve", given: map[string]bool{}},
+		cmd:     &commandLine{name: "serve", values: map[string]string{}},
 		bundled: files,
 		err:     &logged,
 	}
@@ -99,7 +99,7 @@ func TestTheSettingsInsideTheProgramComeBeforeTheWorkingFolder(t *testing.T) {
 		"mine.md": "---\ndate: 2026-01-02\n---\n\n# Mine\n\n# Sentence\n\nA line.\n",
 	})
 	t.Chdir(working)
-	w := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}, bundled: files}
+	w := &work{cmd: &commandLine{name: "serve", values: map[string]string{}}, bundled: files}
 
 	// act
 	set, err := w.settings()
@@ -127,8 +127,7 @@ func TestTheNamedSettingsComeBeforeTheOnesInsideTheProgram(t *testing.T) {
 	})
 	t.Chdir(t.TempDir())
 	w := &work{
-		cmd: &commandLine{name: "serve", globals: globals{config: named},
-			given: map[string]bool{}},
+		cmd:     &commandLine{name: "serve", values: map[string]string{"config": named}},
 		bundled: files,
 	}
 

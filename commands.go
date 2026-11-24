@@ -144,6 +144,11 @@ func (w *work) bundledContent() (fs.FS, error) {
 // A folder named on the command line that holds a settings file of its own
 // is read through that file: the posts line in it says where the writing
 // is, and that is where the writing is read from.
+//
+// The settings inside the program do not name a folder on the disk of the
+// machine the program runs on: a path in them is a path inside the program.
+// The posts are the ones it carries, and not the posts folder of the folder
+// it happens to run in.
 func (w *work) postsFolder(set *settings) (folder string, inside bool, err error) {
 	if w.cmd.folder != "" {
 		if !content.NewDir(w.cmd.folder).Exists() {
@@ -163,6 +168,9 @@ func (w *work) postsFolder(set *settings) (folder string, inside bool, err error
 			return "", false, fmt.Errorf("BAUMKUCHEN_POSTS: no folder at %s", env)
 		}
 		return env, false, nil
+	}
+	if set.inside {
+		return "", true, nil
 	}
 	if set.file.Posts != "" {
 		folder = set.resolve(set.file.Posts)

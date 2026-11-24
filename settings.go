@@ -28,6 +28,10 @@ type settings struct {
 	// it is only the default in the code, and a caller that needs to tell
 	// the two apart looks here.
 	written map[string]bool
+	// inside says the settings came from inside the program. A path in them
+	// is a path inside the program, and not a path on the disk of the
+	// machine the program runs on.
+	inside bool
 }
 
 // names says whether the settings file wrote this setting down, rather than
@@ -88,6 +92,7 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 				from:    "the settings inside the program",
 				bytes:   raw,
 				written: blog.Written(raw),
+				inside:  true,
 			}, nil
 		}
 	}

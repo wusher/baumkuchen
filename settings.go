@@ -165,30 +165,7 @@ addr: 127.0.0.1:8080
 
 // starterPost is the first post the init command writes, so that a new site
 // has something in it and the shape of a post is shown.
-const starterPost = `---
-date: 2026-01-01
-tag: hello
----
-
-# Hello
-
-# Sentence
-
-One sentence is the whole of a post at this depth.
-
-# Paragraph
-
-A paragraph says the same thing at a little more length.
-
-# Short
-
-Three paragraphs carry the idea through, so a reader can stop at any of them.
-
-# Medium
-
-A page holds the whole of it, with the detail that belongs to it.
-
-# Long
-
-Three pages hold everything there is to say about it, and more besides.
-`
+//
+// The post itself is written by the blog package, where the depths are: the
+// names of the depths are said in one place only.
+var starterPost = blog.StarterPost()

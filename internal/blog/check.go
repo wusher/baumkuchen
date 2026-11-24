@@ -7,6 +7,34 @@ import (
 	"strings"
 )
 
+// SchemaVersion is the shape of the report the check command gives.
+//
+// It is written down first, so that a script can read it before it reads
+// anything else and knows what it is looking at. It changes when the shape
+// changes, and for nothing else.
+const SchemaVersion = 1
+
+// The levels a finding can have.
+const (
+	// LevelError is a finding that stops the writing from being right.
+	LevelError = "error"
+	// LevelWarning is a finding the writer should know about, and that does
+	// not stop the site.
+	LevelWarning = "warning"
+)
+
+// The kinds of thing a finding can be about.
+const (
+	// KindMissingDepths is a post that does not carry every depth.
+	KindMissingDepths = "missing-depths"
+	// KindBadDate is a date that cannot be read.
+	KindBadDate = "bad-date"
+	// KindDuplicateSlug is two files that want the same address.
+	KindDuplicateSlug = "duplicate-slug"
+	// KindMissingPicture is a picture a post points at that is not there.
+	KindMissingPicture = "missing-picture"
+)
+
 // Finding is one thing the check command reports.
 type Finding struct {
 	// Level is "error" or "warning".
@@ -24,6 +52,9 @@ type Finding struct {
 // Report is what the check command gives: the counts of the site, and
 // everything it found wrong with it.
 type Report struct {
+	// Schema is the shape of the report. It is the first field, so a script
+	// reads it before anything else.
+	Schema int `json:"schema"`
 	// Published is the number of posts that carry a depth and are not drafts.
 	Published int `json:"published"`
 	// Drafts is the number of posts held back.
@@ -43,6 +74,7 @@ type Report struct {
 // the text names, and the same counts.
 func (s *Site) Check() Report {
 	report := Report{
+		Schema:     SchemaVersion,
 		Published:  len(s.store.Published()),
 		Drafts:     len(s.store.Drafts()),
 		Incomplete: len(s.store.Incomplete()),
@@ -59,8 +91,8 @@ func (s *Site) Check() Report {
 	}
 	for _, d := range s.store.Duplicates() {
 		report.add(Finding{
-			Level:   "error",
-			Kind:    "duplicate-slug",
+			Level:   LevelError,
+			Kind:    KindDuplicateSlug,
 			Slug:    d.Slug,
 			File:    d.Second,
 			Message: fmt.Sprintf("two files want /post/%s: %s and %s", d.Slug, d.First, d.Second),
@@ -69,7 +101,7 @@ func (s *Site) Check() Report {
 	report.Findings = append(report.Findings, s.pictureFindings()...)
 	for _, f := range report.Findings {
 		switch f.Level {
-		case "error":
+		case LevelError:
 			report.Errors++
 		default:
 			report.Warnings++
@@ -96,24 +128,24 @@ func (s *Site) depthFindings(p *Post) []Finding {
 	if len(p.Missing) == depthCount() {
 		if p.Draft {
 			return []Finding{{
-				Level:   "warning",
-				Kind:    "missing-depths",
+				Level:   LevelWarning,
+				Kind:    KindMissingDepths,
 				Slug:    p.Slug,
 				File:    p.File,
 				Message: "no depth yet: it is a draft, so nothing is written under the headings",
 			}}
 		}
 		return []Finding{{
-			Level:   "error",
-			Kind:    "missing-depths",
+			Level:   LevelError,
+			Kind:    KindMissingDepths,
 			Slug:    p.Slug,
 			File:    p.File,
 			Message: "no depth at all: this file cannot publish",
 		}}
 	}
 	return []Finding{{
-		Level:   "warning",
-		Kind:    "missing-depths",
+		Level:   LevelWarning,
+		Kind:    KindMissingDepths,
 		Slug:    p.Slug,
 		File:    p.File,
 		Message: "no depth for: " + strings.Join(p.Missing, ", "),
@@ -126,8 +158,8 @@ func (s *Site) dateFindings(p *Post) []Finding {
 		return nil
 	}
 	return []Finding{{
-		Level:   "error",
-		Kind:    "bad-date",
+		Level:   LevelError,
+		Kind:    KindBadDate,
 		Slug:    p.Slug,
 		File:    p.File,
 		Message: fmt.Sprintf("the date %q cannot be read: it wants a day, as in 2026-01-31", p.BadDate),
@@ -166,8 +198,8 @@ func (s *Site) pictureFinding(p *Post, name string) []Finding {
 		return nil
 	}
 	return []Finding{{
-		Level:   "error",
-		Kind:    "missing-picture",
+		Level:   LevelError,
+		Kind:    KindMissingPicture,
 		Slug:    p.Slug,
 		File:    p.File,
 		Message: fmt.Sprintf("the picture %s is not in the images folder", name),

@@ -572,6 +572,50 @@ them:
     $ baumkuchen check --json ~/blog | jq .published
     12
 
+It says which shape it is before anything else: the `schema` field is the
+first one, and it is `1` now. A script can read it first, and know what it is
+looking at.
+
+    {
+      "schema": 1,
+      "published": 12,
+      "drafts": 1,
+      "incomplete": 0,
+      "warnings": 1,
+      "errors": 0,
+      "findings": [
+        {
+          "level": "warning",
+          "kind": "missing-depths",
+          "slug": "why-rivers",
+          "file": "why-rivers.md",
+          "message": "no depth for: Paragraph, Short, Medium, Long"
+        }
+      ]
+    }
+
+The fields of the report:
+
+* `schema` — the shape of the report: `1` now
+* `published` — the posts that carry a depth and are not drafts
+* `drafts` — the posts held back
+* `incomplete` — the files that carry no depth at all
+* `warnings` — the findings that are warnings
+* `errors` — the findings that are errors
+* `findings` — every finding, in the order they were found
+
+Every finding holds:
+
+* `level` — `error` or `warning`
+* `kind` — what it is about, so a script can pick it out. The kinds are
+  `missing-depths` (a post that does not carry every depth), `bad-date` (a
+  date that cannot be read), `duplicate-slug` (two files that want the same
+  address) and `missing-picture` (a picture a post points at that is not
+  there)
+* `slug` — the post it is about, when it is about one
+* `file` — the file it is about, when it is about one
+* `message` — what is wrong, in a sentence
+
 It leaves with 1 when the writing holds an error, and 0 when it does not. With
 `--strict` a warning is an error as well. The report goes to the standard
 output and the log to the standard error, so a pipe gets the report and

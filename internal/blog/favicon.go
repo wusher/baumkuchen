@@ -22,7 +22,43 @@ type favicon struct {
 	data      []byte
 }
 
-func loadFavicon(src content.Source, file string) (favicon, error) {
+// FaviconName gives the name the picture on the tab has.
+//
+// The name is always favicon.svg, favicon.png or favicon.ico: the tab shows
+// one picture at one address, whatever the file was called.
+func FaviconName(file string) (string, error) {
+	switch strings.ToLower(filepath.Ext(file)) {
+	case ".svg":
+		return "favicon.svg", nil
+	case ".png":
+		return "favicon.png", nil
+	case ".ico":
+		return "favicon.ico", nil
+	}
+	return "", fmt.Errorf("favicon %q: use an SVG, PNG, or ICO file", file)
+}
+
+// faviconType gives the kind of picture a name promises.
+func faviconType(ext string) string {
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".ico":
+		return "image/x-icon"
+	}
+	return "image/svg+xml"
+}
+
+// loadFavicon reads the picture on the tab.
+//
+// The picture is named by the settings. A name that is not there names a
+// file on the disk of the machine the program runs on. A program that
+// carries its settings carries the picture with it, and the name is read
+// inside the program.
+//
+// With no name at all, the picture in the writing is used: favicon.svg
+// beside the posts, if it is there.
+func loadFavicon(src content.Source, file string, inside bool) (favicon, error) {
 	if file == "" {
 		data, err := src.Read(defaultFavicon)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -37,21 +73,23 @@ func loadFavicon(src content.Source, file string) (favicon, error) {
 		return favicon{name: defaultFavicon, mediaType: "image/svg+xml", data: data}, nil
 	}
 
-	ext := strings.ToLower(filepath.Ext(file))
-	var mediaType string
-	switch ext {
-	case ".svg":
-		mediaType = "image/svg+xml"
-	case ".png":
-		mediaType = "image/png"
-	case ".ico":
-		mediaType = "image/x-icon"
-	default:
-		return favicon{}, fmt.Errorf("favicon %q: use an SVG, PNG, or ICO file", file)
-	}
-	data, err := os.ReadFile(file)
+	name, err := FaviconName(file)
 	if err != nil {
-		return favicon{}, fmt.Errorf("read favicon: %w", err)
+		return favicon{}, err
+	}
+	ext := filepath.Ext(name)
+	var data []byte
+	if inside {
+		// the picture travels inside the program, and is read from there
+		data, err = src.Read(file)
+		if err != nil {
+			return favicon{}, fmt.Errorf("read the favicon %s from inside the program: %w", file, err)
+		}
+	} else {
+		data, err = os.ReadFile(file)
+		if err != nil {
+			return favicon{}, fmt.Errorf("read favicon: %w", err)
+		}
 	}
 	// The bytes must be the picture the name promises. The favicon is served
 	// and exported as it is, so a settings file that named some other kind of
@@ -59,7 +97,7 @@ func loadFavicon(src content.Source, file string) (favicon, error) {
 	if !looksLike(ext, data) {
 		return favicon{}, fmt.Errorf("favicon %q does not read as a %s file", file, strings.TrimPrefix(ext, "."))
 	}
-	return favicon{name: "favicon" + ext, mediaType: mediaType, data: data}, nil
+	return favicon{name: name, mediaType: faviconType(ext), data: data}, nil
 }
 
 // looksLike says whether the bytes begin the way the format begins.

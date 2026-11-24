@@ -102,6 +102,51 @@ func LoadFile(path string) (File, bool, error) {
 	return file, true, nil
 }
 
+// WithFavicon gives the settings file with the picture on the tab changed.
+//
+// The file is read and written as YAML, so the comments in it stay. The
+// picture is named by the name it has inside the program: a program that
+// carries its settings carries the picture with it, and the picture is read
+// from there.
+//
+// A file with no picture on the tab in it is given one.
+func WithFavicon(raw []byte, name string) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		// an empty file: there is nothing to change, and the picture is
+		// the one in the writing
+		return raw, nil
+	}
+	mapping := doc.Content[0]
+	found := false
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		key := mapping.Content[i]
+		if key.Value != "favicon" {
+			continue
+		}
+		value := mapping.Content[i+1]
+		value.Kind = yaml.ScalarNode
+		value.Tag = "!!str"
+		value.Value = name
+		value.Content = nil
+		value.Style = 0
+		found = true
+	}
+	if !found {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "favicon"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name})
+	}
+	out, err := yaml.Marshal(&doc)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Load reads the settings from what is written, on top of the defaults. It is
 // how the settings inside the program are read: the same file, wherever it
 // came from.

@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/wusher/baumkuchen/internal/blog"
 	"github.com/wusher/baumkuchen/internal/bundle"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // carried gives the files a program carries inside itself: the writing and
@@ -137,5 +141,99 @@ func TestTheNamedSettingsComeBeforeTheOnesInsideTheProgram(t *testing.T) {
 	}
 	if set.file.Title != "The Named One" {
 		t.Errorf("the title is %q, want the one that was named", set.file.Title)
+	}
+}
+
+// The picture on the tab travels inside the program: it is put inside, and
+// the settings that go inside name it there. A program that carries it shows
+// it at its address, in a folder that holds nothing at all.
+func TestTheBundleCarriesThePictureOnTheTab(t *testing.T) {
+	// arrange
+	const icon = `<svg xmlns="http://www.w3.org/2000/svg"><circle r="7"/></svg>`
+	site := t.TempDir()
+	write(t, filepath.Join(site, settingsName), "title: The Inside One\nfavicon: icon.svg\n")
+	write(t, filepath.Join(site, "icon.svg"), icon)
+	write(t, filepath.Join(site, "mine.md"),
+		"---\ndate: 2026-01-02\n---\n\n# Mine\n\n# Sentence\n\nA line.\n")
+	out := filepath.Join(t.TempDir(), "bundle")
+	t.Chdir(site)
+
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"bundle", ".", "-o", out}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("the code is %d, want 0 (the error stream said: %s)", code, stderr.String())
+	}
+
+	// assert
+	// the picture is inside, and the settings inside name it there
+	files, ok, err := bundle.Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("the bundle carries nothing")
+	}
+	picture, err := fs.ReadFile(files, bundle.Root+"/favicon.svg")
+	if err != nil {
+		t.Fatalf("the picture is not inside the bundle: %v", err)
+	}
+	if string(picture) != icon {
+		t.Errorf("the picture inside is %q, want the one of the writer", picture)
+	}
+	raw, err := fs.ReadFile(files, bundle.Root+"/"+settingsName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "favicon: favicon.svg") {
+		t.Errorf("the settings inside do not name the picture inside: %q", raw)
+	}
+
+	// and the site made from the bundle shows the picture at its address
+	made, err := blog.New(blog.Config{
+		Content:       content.NewFS(files, bundle.Root),
+		Templates:     fs.FS(templateFiles),
+		Static:        fs.FS(staticFiles),
+		Favicon:       "favicon.svg",
+		FaviconInside: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ln, err := made.Listen("127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go made.ServeOn(ln)
+	got := fetch(t, "http://"+ln.Addr().String()+"/favicon.svg")
+	if got != icon {
+		t.Errorf("the picture at the address is %q, want the one of the writer", got)
+	}
+}
+
+// A picture that is not there is a mistake, and the bundle says which one.
+func TestTheBundleRefusesAMissingPicture(t *testing.T) {
+	// arrange
+	site := t.TempDir()
+	write(t, filepath.Join(site, settingsName), "title: The Inside One\nfavicon: missing.svg\n")
+	write(t, filepath.Join(site, "mine.md"),
+		"---\ndate: 2026-01-02\n---\n\n# Mine\n\n# Sentence\n\nA line.\n")
+	out := filepath.Join(t.TempDir(), "bundle")
+	t.Chdir(site)
+
+	// act
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"bundle", ".", "-o", out}, &stdout, &stderr)
+
+	// assert
+	if code != 1 {
+		t.Fatalf("the code is %d, want 1 (the error stream said: %s)", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "missing.svg") {
+		t.Errorf("the message does not name the picture: %q", stderr.String())
+	}
+	if _, err := os.Stat(out); err == nil {
+		t.Error("the bundle was written even though the picture was not there")
 	}
 }

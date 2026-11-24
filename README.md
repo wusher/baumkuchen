@@ -106,6 +106,11 @@ folder to put in. Nothing is ever put inside a program by accident.
 That one file builds the site and serves it, with nothing else on the machine:
 the writing, the templates, the stylesheet and the settings are all in it.
 
+The picture on the tab travels with it. A `favicon:` line in the settings
+names a file on the disk of the writer, so that file is put inside the program
+and the settings inside name it there. A picture that is not there stops the
+bundle and is named.
+
 ## Install
 
 With Go on the machine, one line installs it from anywhere:

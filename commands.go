@@ -241,17 +241,18 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	log.Printf("the settings come from %s", set.from)
 	log.Printf("the posts come from %s", src.Label())
 	return blog.New(blog.Config{
-		Content:    src,
-		Templates:  templateFS,
-		Static:     staticFS,
-		Base:       set.file.Base,
-		Title:      set.file.Title,
-		Heading:    set.file.Heading,
-		Favicon:    set.file.Favicon,
-		LiveReload: w.watching(),
-		DevFiles:   w.dev(),
-		HideDrafts: !drafts,
-		DevErrors:  w.dev(),
+		Content:       src,
+		Templates:     templateFS,
+		Static:        staticFS,
+		Base:          set.file.Base,
+		Title:         set.file.Title,
+		Heading:       set.file.Heading,
+		Favicon:       set.file.Favicon,
+		FaviconInside: set.inside,
+		LiveReload:    w.watching(),
+		DevFiles:      w.dev(),
+		HideDrafts:    !drafts,
+		DevErrors:     w.dev(),
 	})
 }
 
@@ -491,12 +492,55 @@ func (w *work) bundle() error {
 		return err
 	}
 	extra := map[string][]byte{bundle.Root + "/" + settingsName: set.bytes}
+	// the picture on the tab travels inside the program as well
+	icon, iconName, err := bundleIcon(set)
+	if err != nil {
+		return err
+	}
+	if iconName != "" {
+		extra[bundle.Root+"/"+iconName] = icon
+		raw, err := blog.WithFavicon(set.bytes, iconName)
+		if err != nil {
+			return err
+		}
+		extra[bundle.Root+"/"+settingsName] = raw
+	}
 	n, err := bundle.WriteWith(exe, out, folder, extra)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(w.out, "%d file(s) from %s are inside %s\n", n, folder, out)
 	return nil
+}
+
+// bundleIcon gives the picture on the tab, and the name it has inside the
+// program.
+//
+// The settings name a file on the disk of the writer. A bundle travels, so
+// the picture travels with it: it is put inside, and the settings that go
+// inside are changed to name the picture that is there.
+//
+// The file is looked for the way the program looks for it — a relative path
+// starts in the working folder — and then beside the settings file.
+//
+// A picture that is not there is a mistake, and it is named.
+func bundleIcon(set *settings) ([]byte, string, error) {
+	name := set.file.Favicon
+	if name == "" {
+		return nil, "", nil
+	}
+	inside, err := blog.FaviconName(name)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := os.ReadFile(name)
+	if err != nil {
+		data, err = os.ReadFile(set.resolve(name))
+		if err != nil {
+			return nil, "", fmt.Errorf("the favicon %s is not there: %w", name, err)
+		}
+	}
+	return data, inside, nil
 }
 
 // bundleFolder gives the folder the posts are read from, for the bundle

@@ -447,13 +447,16 @@ deploy:
     dist/404.html
     dist/static/style.css   app.js
     dist/media/*
+    dist/.baumkuchen-build   the list of the files the build wrote
 
 A draft never reaches it, and neither does a file with no depth, unless
 `--drafts` is given. `make export` clears the folder of the last build first,
 so a post you renamed leaves no page behind; the clearing is done by `--clean`,
-which removes only what a build wrote — `index.html`, `404.html`, `post/`,
-`static/` and `media/` — and refuses a folder that holds files but no
-`index.html`, because that is not a build.
+which removes the files the last build wrote — the build leaves their names in
+`.baumkuchen-build` — and the folders those files leave empty, and nothing
+else: a file of your own in the folder stays. A folder that holds files but
+no `.baumkuchen-build` is not a build, so it is refused and nothing is
+removed.
 
 The finished program does the same build, without the repository:
 

@@ -28,12 +28,26 @@ func (s *Site) Export(dir string) (int, error) {
 
 // ExportWith writes the whole site into dir as plain files, with the drafts
 // in it when drafts is true.
+//
+// The build leaves a manifest behind: the list of the files it wrote, so that
+// a clean can remove those files and nothing else.
 func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 	posts := s.store.Published()
 	if drafts {
 		posts = s.store.Index()
 	}
 	n := 0
+	// written holds the files this build wrote, relative to dir.
+	var written []string
+
+	// note gives back the name of a file the build wrote.
+	note := func(path string) {
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return
+		}
+		written = append(written, filepath.ToSlash(rel))
+	}
 
 	write := func(path, name string, data pageData) error {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -46,6 +60,7 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 		if err := os.WriteFile(path, withBase(page.Bytes(), s.base), 0o644); err != nil {
 			return err
 		}
+		note(path)
 		n++
 		return nil
 	}
@@ -63,6 +78,7 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 		if err := os.WriteFile(filepath.Join(dir, s.favicon.name), s.favicon.data, 0o644); err != nil {
 			return n, err
 		}
+		note(filepath.Join(dir, s.favicon.name))
 		n++
 	}
 	for _, p := range posts {
@@ -92,6 +108,7 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 		if err := os.WriteFile(out, b, 0o644); err != nil {
 			return err
 		}
+		note(out)
 		n++
 		return nil
 	})
@@ -122,28 +139,40 @@ func (s *Site) ExportWith(dir string, drafts bool) (int, error) {
 		before += src
 		after += dst
 		pictures++
+		note(filepath.Join(dir, "media", filepath.FromSlash(name)))
 		n++
 		return nil
 	})
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return n, nil // a site with no picture is not an error
-		}
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return n, err
 	}
+	// a site with no picture is not an error: there is nothing to copy, and
+	// the build is still a build, so it still leaves its list behind
 	if before > 0 {
 		log.Printf("%d picture(s), %d KB written of %d KB, %d%% saved",
 			pictures, after/1024, before/1024, 100-after*100/before)
 	}
+	if err := writeManifest(dir, written); err != nil {
+		return n, err
+	}
 	return n, nil
 }
 
-// CleanBuild removes the files an earlier build wrote into dir, and leaves
-// everything else where it is.
+// CleanBuild removes the files of an earlier build, and leaves everything
+// else where it is.
 //
-// A folder that holds files but no index.html is not a build, and is
-// refused rather than emptied: a writer who points the build at the wrong
-// folder keeps everything in it.
+// The build leaves a manifest behind: the list of the files it wrote. The
+// clean removes those files, and the folders they leave empty. A file that
+// is not in the manifest is the writer's own, and stays.
+//
+// A folder that holds files but no manifest is not a build, and is refused
+// rather than emptied: a writer who points the build at the wrong folder
+// keeps everything in it.
+//
+// The manifest stays behind, and is empty when the clean is done. The folder
+// is still a build, it holds nothing of the build's now. A second clean
+// finds nothing to remove and does not fail, and a build that fails between
+// the clean and the write can be cleaned again.
 func CleanBuild(dir string) error {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -162,20 +191,37 @@ func CleanBuild(dir string) error {
 	if len(entries) == 0 {
 		return nil
 	}
-	if _, err := os.Stat(filepath.Join(dir, "index.html")); err != nil {
-		return fmt.Errorf("%s holds files but no index.html: it is not a build, so nothing was removed", dir)
+	names, err := readManifest(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%s holds files but no %s: it is not a build, "+
+				"so nothing was removed", dir, manifestName)
+		}
+		return err
 	}
-	for _, name := range []string{"index.html", "404.html"} {
-		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+	// the whole list is read and checked before anything is removed, so a
+	// list that cannot be trusted takes nothing with it
+	targets, err := manifestTargets(dir, names)
+	if err != nil {
+		return err
+	}
+	root := filepath.Clean(dir)
+	var folders []string
+	for _, target := range targets {
+		if err := os.Remove(target); err != nil {
+			if os.IsNotExist(err) {
+				continue // it was removed already
+			}
 			return err
 		}
+		folders = append(folders, filepath.Dir(target))
 	}
-	for _, name := range []string{"post", "static", "media"} {
-		if err := os.RemoveAll(filepath.Join(dir, name)); err != nil {
-			return err
-		}
+	if err := removeEmptyFolders(root, folders); err != nil {
+		return err
 	}
-	return nil
+	// the manifest stays, and is empty: the folder is still a build, and it
+	// holds nothing of the build's now
+	return writeManifest(dir, nil)
 }
 
 // Every link the site writes starts at the root, because that is where the

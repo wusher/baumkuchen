@@ -43,6 +43,9 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 	}
 	w := &work{out: stdout, err: stderr, cmd: cmd}
 	w.setupLog()
+	if cmd.name == "help" {
+		return w.help()
+	}
 	if cmd.globals.help {
 		fmt.Fprint(stdout, usageText(cmd.name, cmd.named))
 		return nil
@@ -62,6 +65,19 @@ func dispatch(argv []string, stdout, stderr io.Writer) error {
 		return w.version()
 	}
 	return usagef("unknown command %s", cmd.name)
+}
+
+// help shows the help: the whole program, or the help of one command.
+//
+// The help is a command as well as a flag, so it can be asked for on its own:
+// baumkuchen help, and baumkuchen help build.
+func (w *work) help() error {
+	if w.cmd.subject != "" {
+		fmt.Fprint(w.out, commandUsage(w.cmd.subject))
+		return nil
+	}
+	fmt.Fprint(w.out, programUsage())
+	return nil
 }
 
 // setupLog sends the log to the error stream, where it belongs.
@@ -124,10 +140,21 @@ func (w *work) bundledContent() (fs.FS, error) {
 // The folder named on the command line comes first, then the one in the
 // environment, then the one in the settings. When none of them is there, the
 // posts carried inside the program are used, if it carries any.
+//
+// A folder named on the command line that holds a settings file of its own
+// is read through that file: the posts line in it says where the writing
+// is, and that is where the writing is read from.
 func (w *work) postsFolder(set *settings) (folder string, inside bool, err error) {
 	if w.cmd.folder != "" {
 		if !content.NewDir(w.cmd.folder).Exists() {
 			return "", false, fmt.Errorf("no folder at %s", w.cmd.folder)
+		}
+		if set != nil && set.names("posts") && set.from != "" &&
+			sameFolder(set.from, w.cmd.folder) {
+			folder = set.resolve(set.file.Posts)
+			if content.NewDir(folder).Exists() {
+				return folder, false, nil
+			}
 		}
 		return w.cmd.folder, false, nil
 	}
@@ -144,6 +171,24 @@ func (w *work) postsFolder(set *settings) (folder string, inside bool, err error
 		}
 	}
 	return "", true, nil
+}
+
+// sameFolder says whether a path is in a folder: the settings file of the
+// folder that was named is the one that speaks for it.
+func sameFolder(path, folder string) bool {
+	dir := filepath.Dir(path)
+	if dir == folder {
+		return true
+	}
+	a, err := filepath.Abs(dir)
+	if err != nil {
+		return false
+	}
+	b, err := filepath.Abs(folder)
+	if err != nil {
+		return false
+	}
+	return a == b
 }
 
 // source says where the posts come from.
@@ -283,7 +328,7 @@ func (w *work) serve() error {
 	defer ln.Close()
 	url := siteURL(ln.Addr())
 	fmt.Fprintf(w.out, "the blog is on %s\n", url)
-	if w.cmd.was("open") {
+	if w.cmd.on("open") {
 		if err := openInBrowser(url); err != nil {
 			log.Printf("open a browser: %v", err)
 		}
@@ -375,12 +420,25 @@ func openInBrowser(url string) error {
 }
 
 // build writes the static site.
+//
+// The output folder and the writing folder are checked against each other
+// before anything is written or removed: the site and the writing are
+// different things, and a build must not put one inside the other.
 func (w *work) build() error {
 	set, err := w.settings()
 	if err != nil {
 		return err
 	}
 	out := w.outFolder(set)
+	posts, inside, err := w.postsFolder(set)
+	if err != nil {
+		return err
+	}
+	if !inside {
+		if err := checkBuildPaths(out, posts); err != nil {
+			return err
+		}
+	}
 	drafts := w.cmd.was("drafts")
 	site, err := w.site(drafts)
 	if err != nil {
@@ -559,7 +617,13 @@ func (w *work) init() error {
 	if err := os.MkdirAll(posts, 0o755); err != nil {
 		return err
 	}
-	fmt.Fprintf(w.out, "wrote %s and the %s folder\n", path, posts)
+	sample := filepath.Join(posts, "hello.md")
+	if _, err := os.Stat(sample); err != nil {
+		if err := os.WriteFile(sample, []byte(starterPost), 0o644); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(w.out, "wrote %s, the %s folder and a first post in it\n", path, posts)
 	return nil
 }
 

@@ -162,7 +162,7 @@ func TestCleanBuild(t *testing.T) {
 	}
 }
 
-// A folder that holds files but no index.html is not a build, and is not
+// A folder that holds files but no manifest is not a build, and is not
 // emptied.
 func TestCleanBuildRefusesAFolderThatIsNotABuild(t *testing.T) {
 	// arrange

@@ -53,6 +53,23 @@ func (f *File) Set(name, value string) {
 	}
 }
 
+// Written gives the names of the settings a file wrote down.
+//
+// A setting that is not in the file is not written: only the default in the
+// code stands for it. This tells the two apart, so a caller knows whether a
+// line was chosen or only inherited.
+func Written(raw []byte) map[string]bool {
+	out := map[string]bool{}
+	var fields map[string]yaml.Node
+	if err := yaml.Unmarshal(raw, &fields); err != nil {
+		return out
+	}
+	for name := range fields {
+		out[name] = true
+	}
+	return out
+}
+
 // Defaults are what a site holds before its settings file is read.
 //
 // The address is the loopback one: a server that answers only this machine

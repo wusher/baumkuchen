@@ -40,15 +40,16 @@ folder and the flags may come in any order after it.
     baumkuchen check ~/blog          # what is wrong with the writing
     baumkuchen check --json ~/blog   # the same report, as JSON
     baumkuchen bundle ~/blog -o one  # one file with the program and the writing in it
-    baumkuchen init my-blog          # the settings file for a new site
+    baumkuchen init my-blog          # the settings file and a first post
     baumkuchen version               # which build this is
+    baumkuchen help                  # the same help, as a command
 
 `serve` is the one that stands in for the others: `baumkuchen ~/blog` and
 `baumkuchen serve ~/blog` are the same command.
 
-Every command understands `--config FILE`, `--quiet`, `--verbose` and
-`--help`. Each command has flags of its own, and `baumkuchen <command> --help`
-lists them.
+Every command understands `--config PATH`, `--quiet` and `--help`. Each
+command has flags of its own, and `baumkuchen <command> --help` lists them.
+`baumkuchen help <command>` gives the same list.
 
 **The codes.** 0 when all went well, 1 when something went wrong, and 2 when
 the command line itself was wrong. A flag that is gone says what to write
@@ -65,11 +66,17 @@ instead, and leaves with 2:
 
 **The live site.** The server answers on an address and rereads the writing
 when a file changes, so you can edit a post and refresh the page. Give
-`--open` and the browser opens on it by itself. Ctrl+C stops it cleanly.
+`--open` and the browser opens on it by itself; `--open=false` keeps it shut.
+Ctrl+C stops it cleanly.
 
     ./build/baumkuchen serve ~/blog --addr 127.0.0.1:8080 --open
 
 Both work the same whether the writing is in a folder or inside the program.
+
+**A new site.** `baumkuchen init my-blog` writes the settings file, the
+`posts` folder and a first post with all five depths in it, so the site can
+be served right away. The post is written once: when it is there, it is the
+writer's, and `init` does not write over it.
 
 ## Where the writing comes from
 
@@ -200,6 +207,11 @@ then the one in the folder named on the command line, then the one in the
 working folder, then the one inside a program that carries its writing. A file
 that is named and is not there is a mistake, and is reported as one. A file
 that is not named and is not there is not a mistake at all: the defaults stand.
+
+A folder named on the command line that holds a `baumkuchen.yml` of its own
+is read through that file: the `posts:` line in it says where the writing is,
+and that is where the writing is read from. A folder named on the command
+line that holds no settings file of its own is the writing itself.
 
 The settings of the site the program was built from are not read out of the
 program. A copy of it serves the site it is told about, and a build from a
@@ -435,13 +447,16 @@ deploy:
     dist/404.html
     dist/static/style.css   app.js
     dist/media/*
+    dist/.baumkuchen-build   the list of the files the build wrote
 
 A draft never reaches it, and neither does a file with no depth, unless
 `--drafts` is given. `make export` clears the folder of the last build first,
 so a post you renamed leaves no page behind; the clearing is done by `--clean`,
-which removes only what a build wrote — `index.html`, `404.html`, `post/`,
-`static/` and `media/` — and refuses a folder that holds files but no
-`index.html`, because that is not a build.
+which removes the files the last build wrote — the build leaves their names in
+`.baumkuchen-build` — and the folders those files leave empty, and nothing
+else: a file of your own in the folder stays. A folder that holds files but
+no `.baumkuchen-build` is not a build, so it is refused and nothing is
+removed.
 
 The finished program does the same build, without the repository:
 

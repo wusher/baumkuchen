@@ -293,6 +293,24 @@ if grep -q '/baumkuchen/' "$work/away/site2/index.html"; then
   fail "the bundle carries a folder it was never given"
 fi
 
+# ---- a bundle written over the program itself ----
+# The program is copied, and the copy is given the writing: the copy becomes
+# a bundle of itself. The bundle is then written over the copy again, and the
+# copy does not grow by the size of a bundle, because the old content is
+# taken away before the new one goes in.
+cp "$binary" "$work/self"
+( cd "$work/away" && "$work/self" bundle "$work/posts" -o "$work/self" ) >"$work/self.log" 2>&1 \
+  || fail "the bundle over the program did not finish: $(cat "$work/self.log")"
+first=$(wc -c < "$work/self")
+( cd "$work/away" && "$work/self" bundle "$work/posts" -o "$work/self" ) >>"$work/self.log" 2>&1 \
+  || fail "the second bundle over the program did not finish: $(cat "$work/self.log")"
+second=$(wc -c < "$work/self")
+[ "$second" -eq "$first" ] \
+  || fail "the program grew from $first to $second bytes: the old bundle is still in it"
+( cd "$work/away" && "$work/self" build --out "$work/away/site-self" ) >"$work/self-build.log" 2>&1 \
+  || fail "the bundle over the program did not build the site: $(cat "$work/self-build.log")"
+[ -f "$work/away/site-self/post/hello/index.html" ] || fail "the bundle over the program did not write the post"
+
 # ---- a program with no posts says so, and names the ways to give it some ----
 if ( cd "$work/away" && "$binary" build --out "$work/away/site3" ) >"$work/noposts.log" 2>&1; then
   fail "a program with no posts must not build a site"

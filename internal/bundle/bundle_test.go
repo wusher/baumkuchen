@@ -105,6 +105,53 @@ func TestWriteIsTheSameEveryTime(t *testing.T) {
 	}
 }
 
+// A bundle written over the program itself is the program with the writing
+// in it, and not the program with the writing in it twice: the old content is
+// taken away before the new one goes in.
+func TestWriteOverTheProgramItself(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	program := write(t, dir, "baumkuchen", "the program itself\n")
+	content := t.TempDir()
+	write(t, content, "one.md", "# One\n")
+
+	// act
+	if _, err := Write(program, program, content); err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.Stat(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Write(program, program, content); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.Stat(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// assert
+	if second.Size() != first.Size() {
+		t.Errorf("the bundle written over itself is %d bytes, want %d: the old content is still in it",
+			second.Size(), first.Size())
+	}
+	files, ok, err := Open(program)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("the program says it holds nothing")
+	}
+	data, err := fs.ReadFile(files, Root+"/one.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "# One\n" {
+		t.Errorf("the file came back as %q", data)
+	}
+}
+
 // A bundle of a bundle carries one set of content, not two: the old one is
 // taken away before the new one goes in.
 func TestWriteStripsTheOldBundle(t *testing.T) {

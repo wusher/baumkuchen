@@ -226,10 +226,11 @@ that is swallowed is a setting that quietly does nothing. The Makefile reads
 the folders out of the same file, so there is one place to change them.
 
 The settings file is looked for in this order: the one named with `--config`,
-then the one in the folder named on the command line, then the one in the
-working folder, then the one inside a program that carries its writing. A file
-that is named and is not there is a mistake, and is reported as one. A file
-that is not named and is not there is not a mistake at all: the defaults stand.
+then the one in the folder named on the command line, then the one inside a
+program that carries its writing, then the one in the working folder, and
+last the defaults in the code. A file that is named and is not there is a
+mistake, and is reported as one. A file that is not named and is not there is
+not a mistake at all: the defaults stand.
 
 A folder named on the command line that holds a `baumkuchen.yml` of its own
 is read through that file: the `posts:` line in it says where the writing is,
@@ -251,9 +252,10 @@ for you, not for the site: the file name is still the URL, so
 In this repository the writing is a link to a folder outside it. The link is
 per machine: `make setup` asks where the writing lives and makes it, or
 `scripts/link-posts.sh ~/blog` makes it without a question. The link is
-followed once, when the folder is opened, so every path inside is a real one.
-A program that was copied somewhere else reads the same writing from the
-folder you name on the command line.
+followed every time the writing is read, so every path inside is a real one,
+and a link that is moved is followed where it now points. A program that was
+copied somewhere else reads the same writing from the folder you name on the
+command line.
 
 Two folders are stepped over: `images/`, which holds the pictures, and anything
 whose name starts with a dot.
@@ -481,6 +483,11 @@ else: a file of your own in the folder stays. A folder that holds files but
 no `.baumkuchen-build` is not a build, so it is refused and nothing is
 removed.
 
+The list stays behind after the clean, and is empty then: the folder is still
+a build, and it holds nothing of the build's now. A second clean finds
+nothing to remove and does not fail, so a build that fails between the clean
+and the write can be cleaned again.
+
 The finished program does the same build, without the repository:
 
     ./build/baumkuchen build ~/blog -o out
@@ -571,6 +578,50 @@ them:
 
     $ baumkuchen check --json ~/blog | jq .published
     12
+
+It says which shape it is before anything else: the `schema` field is the
+first one, and it is `1` now. A script can read it first, and know what it is
+looking at.
+
+    {
+      "schema": 1,
+      "published": 12,
+      "drafts": 1,
+      "incomplete": 0,
+      "warnings": 1,
+      "errors": 0,
+      "findings": [
+        {
+          "level": "warning",
+          "kind": "missing-depths",
+          "slug": "why-rivers",
+          "file": "why-rivers.md",
+          "message": "no depth for: Paragraph, Short, Medium, Long"
+        }
+      ]
+    }
+
+The fields of the report:
+
+* `schema` — the shape of the report: `1` now
+* `published` — the posts that carry a depth and are not drafts
+* `drafts` — the posts held back
+* `incomplete` — the files that carry no depth at all
+* `warnings` — the findings that are warnings
+* `errors` — the findings that are errors
+* `findings` — every finding, in the order they were found
+
+Every finding holds:
+
+* `level` — `error` or `warning`
+* `kind` — what it is about, so a script can pick it out. The kinds are
+  `missing-depths` (a post that does not carry every depth), `bad-date` (a
+  date that cannot be read), `duplicate-slug` (two files that want the same
+  address) and `missing-picture` (a picture a post points at that is not
+  there)
+* `slug` — the post it is about, when it is about one
+* `file` — the file it is about, when it is about one
+* `message` — what is wrong, in a sentence
 
 It leaves with 1 when the writing holds an error, and 0 when it does not. With
 `--strict` a warning is an error as well. The report goes to the standard

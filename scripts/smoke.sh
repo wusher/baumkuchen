@@ -197,7 +197,9 @@ server=""
 # No --addr is given, and the settings of the repository are not here, so the
 # address in the program's own defaults is used: the loopback one. A server
 # that answers only this machine is the safe first answer.
-( cd "$work/away" && exec "$binary" serve "$work/posts" ) >"$work/default.log" 2>&1 &
+# --open=false is given as well, so that no browser is opened on this
+# machine: the flag is read, and nothing is opened.
+( cd "$work/away" && exec "$binary" serve "$work/posts" --open=false ) >"$work/default.log" 2>&1 &
 server=$!
 said=0
 for _ in $(seq 1 50); do
@@ -291,11 +293,68 @@ if grep -q '/baumkuchen/' "$work/away/site2/index.html"; then
   fail "the bundle carries a folder it was never given"
 fi
 
+# ---- a bundle written over the program itself ----
+# The program is copied, and the copy is given the writing: the copy becomes
+# a bundle of itself. The bundle is then written over the copy again, and the
+# copy does not grow by the size of a bundle, because the old content is
+# taken away before the new one goes in.
+cp "$binary" "$work/self"
+( cd "$work/away" && "$work/self" bundle "$work/posts" -o "$work/self" ) >"$work/self.log" 2>&1 \
+  || fail "the bundle over the program did not finish: $(cat "$work/self.log")"
+first=$(wc -c < "$work/self")
+( cd "$work/away" && "$work/self" bundle "$work/posts" -o "$work/self" ) >>"$work/self.log" 2>&1 \
+  || fail "the second bundle over the program did not finish: $(cat "$work/self.log")"
+second=$(wc -c < "$work/self")
+[ "$second" -eq "$first" ] \
+  || fail "the program grew from $first to $second bytes: the old bundle is still in it"
+( cd "$work/away" && "$work/self" build --out "$work/away/site-self" ) >"$work/self-build.log" 2>&1 \
+  || fail "the bundle over the program did not build the site: $(cat "$work/self-build.log")"
+[ -f "$work/away/site-self/post/hello/index.html" ] || fail "the bundle over the program did not write the post"
+
 # ---- a program with no posts says so, and names the ways to give it some ----
 if ( cd "$work/away" && "$binary" build --out "$work/away/site3" ) >"$work/noposts.log" 2>&1; then
   fail "a program with no posts must not build a site"
 fi
 grep -q 'no posts' "$work/noposts.log" || fail "the error does not name the missing posts: $(cat "$work/noposts.log")"
+
+# ---- every command the README lists is run here ----
+# The list is the one in "The commands" of the README, with the folder of the
+# writing in place of ~/blog. A command that is written down and is not run
+# is a command that does not work.
+( cd "$work/away" && "$binary" version ) >"$work/version.log" 2>&1 \
+  || fail "the version command did not finish: $(cat "$work/version.log")"
+grep -q '^baumkuchen ' "$work/version.log" \
+  || fail "the version command said nothing about the build: $(cat "$work/version.log")"
+
+( cd "$work/away" && "$binary" help ) >"$work/help.log" 2>&1 \
+  || fail "the help command did not finish: $(cat "$work/help.log")"
+grep -q 'baumkuchen \[serve\]' "$work/help.log" \
+  || fail "the help does not hold the commands: $(cat "$work/help.log")"
+
+( cd "$work/away" && "$binary" init my-blog ) >"$work/init.log" 2>&1 \
+  || fail "the init command did not finish: $(cat "$work/init.log")"
+[ -f "$work/away/my-blog/baumkuchen.yml" ] || fail "the init command wrote no settings file"
+[ -f "$work/away/my-blog/posts/hello.md" ] || fail "the init command wrote no first post"
+
+# ---- the writing can come from the environment ----
+( cd "$work/away" && BAUMKUCHEN_POSTS="$work/posts" "$binary" check ) >"$work/env.log" 2>&1 \
+  || fail "the check with the folder in the environment did not finish: $(cat "$work/env.log")"
+grep -q '1 published post(s)' "$work/env.log" \
+  || fail "the folder in the environment was not used: $(cat "$work/env.log")"
+
+# ---- and the settings can be named on the command line ----
+printf 'title: Somewhere Else\n' > "$work/other.yml"
+( cd "$work/away" && "$binary" check --config "$work/other.yml" "$work/posts" ) >"$work/config.log" 2>&1 \
+  || fail "the check with other settings did not finish: $(cat "$work/config.log")"
+grep -q 'other.yml' "$work/config.log" \
+  || fail "the settings named on the command line were not used: $(cat "$work/config.log")"
+
+# ---- a flag beats the settings file ----
+( cd "$work/away" && "$binary" build "$work/posts" --title "Somewhere Else" --out "$work/site-title" ) \
+  >"$work/title.log" 2>&1 \
+  || fail "the build with a title did not finish: $(cat "$work/title.log")"
+grep -q 'Somewhere Else' "$work/site-title/index.html" \
+  || fail "the title on the command line did not reach the built site"
 
 # ---- the command line is read the way it is written ----
 code=0

@@ -5,7 +5,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/wusher/baumkuchen/internal/content"
 )
+
+// A counting source counts the times the writing is looked at.
+type countingSource struct {
+	content.Source
+	looks int
+}
+
+func (c *countingSource) List() ([]string, error) {
+	c.looks++
+	return c.Source.List()
+}
 
 // A flag is on only for the words that mean yes.
 func TestTruthy(t *testing.T) {
@@ -253,5 +267,54 @@ func TestSameNameInTwoFolders(t *testing.T) {
 	}
 	if got := len(s.Index()); got != 1 {
 		t.Errorf("the index holds %d, want 1: the other file is not shown twice", got)
+	}
+}
+
+// Ten questions about the writing inside a tenth of a second are answered
+// from the mark the store already holds, so the writing is looked at once and
+// not once for every question.
+func TestTenQuestionsReadTheWritingOnce(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	src := &countingSource{Source: content.NewDir(dir)}
+	s := NewStoreFrom(src)
+
+	// act
+	mark := ""
+	for i := 0; i < 10; i++ {
+		mark = s.Version()
+	}
+
+	// assert
+	if src.looks != 1 {
+		t.Errorf("the writing was looked at %d times for ten questions, want 1",
+			src.looks)
+	}
+	if mark == "" {
+		t.Error("the mark of the writing is empty")
+	}
+}
+
+// The mark is held for a moment, and not for longer: an edit is seen as soon
+// as the window has passed.
+func TestTheMarkChangesWhenTheWindowHasPassed(t *testing.T) {
+	// arrange
+	dir := t.TempDir()
+	postFile(t, dir, "one.md", "---\ndate: 2026-01-01\n---\n", "One")
+	s := NewStore(dir)
+	if err := s.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	before := s.Version()
+
+	// act
+	postFile(t, dir, "two.md", "---\ndate: 2026-01-02\n---\n", "Two")
+	time.Sleep(VersionWindow + 20*time.Millisecond)
+	after := s.Version()
+
+	// assert
+	if before == after {
+		t.Error("the mark of the writing did not change when a file was added")
 	}
 }

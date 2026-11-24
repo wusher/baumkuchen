@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "published": 4,
+  "drafts": 1,
+  "incomplete": 2,
+  "warnings": 3,
+  "errors": 4,
+  "findings": [
+    {
+      "level": "warning",
+      "kind": "missing-depths",
+      "slug": "picture",
+      "file": "picture.md",
+      "message": "no depth for: Paragraph, Short, Medium, Long"
+    },
+    {
+      "level": "warning",
+      "kind": "missing-depths",
+      "slug": "wip",
+      "file": "_drafts/wip.md",
+      "message": "no depth for: Paragraph, Short, Medium, Long"
+    },
+    {
+      "level": "error",
+      "kind": "missing-depths",
+      "slug": "notes",
+      "file": "notes.md",
+      "message": "no depth at all: this file cannot publish"
+    },
+    {
+      "level": "warning",
+      "kind": "missing-depths",
+      "slug": "nothing",
+      "file": "_drafts/nothing.md",
+      "message": "no depth yet: it is a draft, so nothing is written under the headings"
+    },
+    {
+      "level": "error",
+      "kind": "bad-date",
+      "slug": "bad-date",
+      "file": "bad-date.md",
+      "message": "the date \"2026-13-45\" cannot be read: it wants a day, as in 2026-01-31"
+    },
+    {
+      "level": "error",
+      "kind": "duplicate-slug",
+      "slug": "twice",
+      "file": "b/twice.md",
+      "message": "two files want /post/twice: a/twice.md and b/twice.md"
+    },
+    {
+      "level": "error",
+      "kind": "missing-picture",
+      "slug": "picture",
+      "file": "picture.md",
+      "message": "the picture gone.jpg is not in the images folder"
+    }
+  ]
+}

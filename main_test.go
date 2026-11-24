@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/wusher/baumkuchen/internal/blog"
 )
@@ -649,6 +650,9 @@ func TestTheServerTellsTheBrowserWhenTheWritingChanges(t *testing.T) {
 	write(t, filepath.Join(posts, "one.md"),
 		"---\ndate: 2026-01-02\ntag: earth\n---\n\n# One\n\n# Sentence\n\n"+
 			"A line written after the server started.\n")
+	// the mark of the writing is held for a moment, so the store is given
+	// the time to look at the writing again
+	time.Sleep(blog.VersionWindow + 20*time.Millisecond)
 	after := marks(t, url)
 
 	// assert

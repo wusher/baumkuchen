@@ -28,6 +28,10 @@ type settings struct {
 	// it is only the default in the code, and a caller that needs to tell
 	// the two apart looks here.
 	written map[string]bool
+	// inside says the settings came from inside the program. A path in them
+	// is a path inside the program, and not a path on the disk of the
+	// machine the program runs on.
+	inside bool
 }
 
 // names says whether the settings file wrote this setting down, rather than
@@ -49,14 +53,20 @@ func (s *settings) resolve(path string) string {
 // findSettings reads the settings for a run.
 //
 // The file named on the command line comes first. Then the one in the posts
-// folder. Then the one in the working folder. Then the one inside a bundled
-// program, which carries the settings it was made with. Last are the defaults
-// in the code.
+// folder. Then the one inside a program that carries one. Then the one in
+// the working folder. Last are the defaults in the code.
 //
-// The settings the program was made with are not read. A copy of the program
-// does not inherit the site it was built from: a build from a folder that
-// holds no settings file is published at the root, and the links it writes
-// carry no folder.
+// The settings inside the program come before the file in the working
+// folder: a bundle is the same site in every folder, and a file in the
+// folder the program happens to run in would make it a different site in
+// each one. The file named on the command line comes first of all, so that
+// a writer can replace them on purpose.
+//
+// The settings of the site the program was made in are not built into it.
+// A copy of the program does not inherit the site it was built from: a build
+// from a folder that holds no settings file is published at the root, and
+// the links it writes carry no folder. A program that carries settings
+// carries them on purpose, and they are the ones inside it.
 //
 // A file that is named and is not there is a mistake, and it is reported as
 // one. A file that is not named and is not there is not a mistake at all:
@@ -70,9 +80,6 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 		if _, err := os.Stat(path); err == nil {
 			return readSettings(path, folder)
 		}
-	}
-	if _, err := os.Stat(settingsName); err == nil {
-		return readSettings(settingsName, ".")
 	}
 	if bundled != nil {
 		name := bundle.Root + "/" + settingsName
@@ -88,11 +95,15 @@ func findSettings(explicit, folder string, bundled fs.FS) (*settings, error) {
 				from:    "the settings inside the program",
 				bytes:   raw,
 				written: blog.Written(raw),
+				inside:  true,
 			}, nil
 		}
 	}
-	// the settings the program was made with are not read: a copy of it does
-	// not inherit the site it was built from
+	if _, err := os.Stat(settingsName); err == nil {
+		return readSettings(settingsName, ".")
+	}
+	// the settings of the site the program was made in are not read: a copy
+	// of it does not inherit the site it was built from
 	return &settings{
 		file:    blog.Defaults(),
 		dir:     ".",

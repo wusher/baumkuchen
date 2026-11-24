@@ -49,6 +49,9 @@ type Config struct {
 	Heading string
 	// Favicon is a local file to use instead of the icon in the posts folder.
 	Favicon string
+	// FaviconInside says the picture named by Favicon is inside the content
+	// and not on the disk. A bundle carries its picture with it.
+	FaviconInside bool
 	// LiveReload tells an open browser when the writing changes, so that an
 	// edited post refreshes the page instead of waiting for the writer to
 	// press the button. The running server always does this.
@@ -98,7 +101,7 @@ func New(cfg Config) (*Site, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the pictures: %w", err)
 	}
-	icon, err := loadFavicon(src, cfg.Favicon)
+	icon, err := loadFavicon(src, cfg.Favicon, cfg.FaviconInside)
 	if err != nil {
 		return nil, err
 	}

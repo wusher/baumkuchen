@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -144,6 +145,11 @@ func (w *work) bundledContent() (fs.FS, error) {
 // A folder named on the command line that holds a settings file of its own
 // is read through that file: the posts line in it says where the writing
 // is, and that is where the writing is read from.
+//
+// The settings inside the program do not name a folder on the disk of the
+// machine the program runs on: a path in them is a path inside the program.
+// The posts are the ones it carries, and not the posts folder of the folder
+// it happens to run in.
 func (w *work) postsFolder(set *settings) (folder string, inside bool, err error) {
 	if w.cmd.folder != "" {
 		if !content.NewDir(w.cmd.folder).Exists() {
@@ -163,6 +169,9 @@ func (w *work) postsFolder(set *settings) (folder string, inside bool, err error
 			return "", false, fmt.Errorf("BAUMKUCHEN_POSTS: no folder at %s", env)
 		}
 		return env, false, nil
+	}
+	if set.inside {
+		return "", true, nil
 	}
 	if set.file.Posts != "" {
 		folder = set.resolve(set.file.Posts)
@@ -233,17 +242,18 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	log.Printf("the settings come from %s", set.from)
 	log.Printf("the posts come from %s", src.Label())
 	return blog.New(blog.Config{
-		Content:    src,
-		Templates:  templateFS,
-		Static:     staticFS,
-		Base:       set.file.Base,
-		Title:      set.file.Title,
-		Heading:    set.file.Heading,
-		Favicon:    set.file.Favicon,
-		LiveReload: w.watching(),
-		DevFiles:   w.dev(),
-		HideDrafts: !drafts,
-		DevErrors:  w.dev(),
+		Content:       src,
+		Templates:     templateFS,
+		Static:        staticFS,
+		Base:          set.file.Base,
+		Title:         set.file.Title,
+		Heading:       set.file.Heading,
+		Favicon:       set.file.Favicon,
+		FaviconInside: set.inside,
+		LiveReload:    w.watching(),
+		DevFiles:      w.dev(),
+		HideDrafts:    !drafts,
+		DevErrors:     w.dev(),
 	})
 }
 
@@ -307,6 +317,11 @@ func (w *work) serve() error {
 		return err
 	}
 	addr := w.addr(set)
+	// the address is looked at before the writing is read, so a mistake in it
+	// is the first thing the writer hears about
+	if err := checkAddr(addr); err != nil {
+		return err
+	}
 	drafts := w.drafts(addr)
 	site, err := w.site(drafts)
 	if err != nil {
@@ -334,6 +349,35 @@ func (w *work) serve() error {
 		}
 	}
 	return site.ServeOn(ln)
+}
+
+// checkAddr says whether the address can be listened on.
+//
+// An address without a port in it is a mistake the writer can fix in one
+// step, so it is named, and the two forms that work are given. A port that
+// is not a number is the same mistake in the other half of the address.
+//
+// The check is made before the socket is opened, so the message comes
+// before anything else is said about the site.
+func checkAddr(addr string) error {
+	_, port, err := net.SplitHostPort(addr)
+	if err == nil {
+		if _, perr := strconv.Atoi(port); perr != nil {
+			return usagef("the port in %s is not a number: use :8080 or 127.0.0.1:8080", addr)
+		}
+		return nil
+	}
+	if isNumber(addr) {
+		return usagef("the address %s has no port in it: use :%s or 127.0.0.1:%s",
+			addr, addr, addr)
+	}
+	return usagef("the address %s has no port in it: use :8080 or 127.0.0.1:8080", addr)
+}
+
+// isNumber says whether a word is a number.
+func isNumber(word string) bool {
+	_, err := strconv.Atoi(word)
+	return err == nil
 }
 
 // drafts says whether the drafts are shown.
@@ -483,12 +527,55 @@ func (w *work) bundle() error {
 		return err
 	}
 	extra := map[string][]byte{bundle.Root + "/" + settingsName: set.bytes}
+	// the picture on the tab travels inside the program as well
+	icon, iconName, err := bundleIcon(set)
+	if err != nil {
+		return err
+	}
+	if iconName != "" {
+		extra[bundle.Root+"/"+iconName] = icon
+		raw, err := blog.WithFavicon(set.bytes, iconName)
+		if err != nil {
+			return err
+		}
+		extra[bundle.Root+"/"+settingsName] = raw
+	}
 	n, err := bundle.WriteWith(exe, out, folder, extra)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(w.out, "%d file(s) from %s are inside %s\n", n, folder, out)
 	return nil
+}
+
+// bundleIcon gives the picture on the tab, and the name it has inside the
+// program.
+//
+// The settings name a file on the disk of the writer. A bundle travels, so
+// the picture travels with it: it is put inside, and the settings that go
+// inside are changed to name the picture that is there.
+//
+// The file is looked for the way the program looks for it — a relative path
+// starts in the working folder — and then beside the settings file.
+//
+// A picture that is not there is a mistake, and it is named.
+func bundleIcon(set *settings) ([]byte, string, error) {
+	name := set.file.Favicon
+	if name == "" {
+		return nil, "", nil
+	}
+	inside, err := blog.FaviconName(name)
+	if err != nil {
+		return nil, "", err
+	}
+	data, err := os.ReadFile(name)
+	if err != nil {
+		data, err = os.ReadFile(set.resolve(name))
+		if err != nil {
+			return nil, "", fmt.Errorf("the favicon %s is not there: %w", name, err)
+		}
+	}
+	return data, inside, nil
 }
 
 // bundleFolder gives the folder the posts are read from, for the bundle

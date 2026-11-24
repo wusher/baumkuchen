@@ -81,7 +81,9 @@ writer's, and `init` does not write over it.
 ## Where the writing comes from
 
 The first one that is given wins: the folder named on the command line, then
-the environment, then the `posts:` line in the settings file.
+the environment, then the `posts:` line in the settings file. A program that
+carries its writing carries the writing with it: the `posts:` line in the
+settings inside it is not used, and the writing comes from the program.
 
     ./build/baumkuchen ~/blog                    # a folder, as an argument
     BAUMKUCHEN_POSTS=~/blog ./build/baumkuchen  # the same, from the environment
@@ -103,6 +105,11 @@ folder to put in. Nothing is ever put inside a program by accident.
 
 That one file builds the site and serves it, with nothing else on the machine:
 the writing, the templates, the stylesheet and the settings are all in it.
+
+The picture on the tab travels with it. A `favicon:` line in the settings
+names a file on the disk of the writer, so that file is put inside the program
+and the settings inside name it there. A picture that is not there stops the
+bundle and is named.
 
 ## Install
 
@@ -191,6 +198,22 @@ A flag beats the file, and only a flag you actually gave:
     go run . build --title "Something Else"
     go run . serve --heading "Read deeper" --favicon ./my-icon.png
     go run . --config other.yml
+
+### Where the settings come from
+
+The first one that is there wins, and the order is this:
+
+1. the file named with `--config FILE`
+2. the `baumkuchen.yml` in the folder named on the command line
+3. the `baumkuchen.yml` inside a program that carries one
+4. the `baumkuchen.yml` in the working folder
+5. the defaults in the code
+
+The settings inside the program come before the file in the working folder: a
+bundle is the same site in every folder, and a file in the folder the program
+happens to run in would make it a different site in each one. `--config FILE`
+comes first of all, so a writer can replace the settings of a bundle on
+purpose.
 
 Put `favicon.svg` beside your Markdown posts to set the browser icon. To use a
 different SVG, PNG, or ICO file, pass `--favicon PATH` or set `favicon: PATH` in

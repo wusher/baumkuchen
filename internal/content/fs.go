@@ -23,11 +23,12 @@ func NewFS(files fs.FS, root string) *FS {
 }
 
 // Label names the file set, so a log says where the content came from.
+//
+// The folder the content sits in inside the file set is not said: the
+// program that carries it says that it is inside the program, and that is
+// what the writer needs to know.
 func (f *FS) Label() string {
-	if f.root == "" {
-		return "inside the program"
-	}
-	return "inside the program, under " + f.root
+	return "inside the program"
 }
 
 // Exists always says yes: a file set that is open holds its content.

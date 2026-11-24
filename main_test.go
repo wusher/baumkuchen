@@ -204,6 +204,61 @@ func TestTheVersionIsAskedForWithAFlagToo(t *testing.T) {
 	}
 }
 
+// The short flags may be written together, as in -qh. Only the last one of
+// them can take a value, so the value of a group is written after it.
+func TestGroupedShortFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		argv    []string
+		quiet   bool
+		help    bool
+		out     string
+		wantErr string
+	}{
+		{name: "two flags together", argv: []string{"-qh"}, quiet: true, help: true},
+		{name: "a flag that takes a value", argv: []string{"build", "-qo", "out"},
+			quiet: true, out: "out"},
+		{name: "a letter that is not a flag", argv: []string{"-qx"}, wantErr: "unknown flag -x"},
+		{name: "a value in the middle of a group", argv: []string{"-oq", "out"},
+			wantErr: "only the last flag"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// act
+			cmd, err := readArgs(c.argv)
+
+			// assert
+			if c.wantErr != "" {
+				if err == nil {
+					t.Fatalf("no error, want one about %q", c.wantErr)
+				}
+				if !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("the error is %q, want it to mention %q", err, c.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.quiet && !cmd.globals.quiet {
+				t.Error("the quiet flag was not read")
+			}
+			if c.help && !cmd.globals.help {
+				t.Error("the help flag was not read")
+			}
+			if c.out != "" {
+				got, ok := cmd.value("out")
+				if !ok {
+					t.Fatal("the out flag was not given")
+				}
+				if got != c.out {
+					t.Errorf("out = %q, want %q", got, c.out)
+				}
+			}
+		})
+	}
+}
+
 // The settings come from the file that was named, then the one in the posts
 // folder, then the one inside the program, then the one in the working
 // folder, then the ones in the code.

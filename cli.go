@@ -198,6 +198,10 @@ func splitFlag(arg string) (name, value string, hasValue bool) {
 // the folder may come before the flags or after them. A folder whose name is
 // the name of a command has to be written with a path in front of it, as in
 // ./build, so that there is never a doubt about what it is.
+//
+// The short flags may be written together, as in -qh. Only the last one of
+// them can take a value, so the value of a group is written after it, as in
+// -qo out.
 func readArgs(argv []string) (*commandLine, error) {
 	table := knownFlags()
 	type given struct {
@@ -219,7 +223,36 @@ func readArgs(argv []string) (*commandLine, error) {
 			}
 			def, known := table[name]
 			if !known {
-				return nil, usagef("unknown flag %s", "--"+name)
+				// A group of short flags: -qh is -q -h. Only the last one
+				// of them can take a value, so -qo out is the way to write
+				// it.
+				if strings.HasPrefix(arg, "--") || len(name) < 2 {
+					return nil, usagef("unknown flag %s", "--"+name)
+				}
+				for j := 0; j < len(name); j++ {
+					letter := string(name[j])
+					def, ok := table[letter]
+					if !ok {
+						return nil, usagef("unknown flag %s", "-"+letter)
+					}
+					if !def.arg {
+						flags = append(flags, given{name: def.name, value: "true"})
+						continue
+					}
+					if j < len(name)-1 {
+						return nil, usagef("-%s needs a value: only the last flag "+
+							"of a group can take one", letter)
+					}
+					if !hasValue {
+						if i+1 >= len(argv) {
+							return nil, usagef("%s needs a value", "--"+def.name)
+						}
+						i++
+						value = argv[i]
+					}
+					flags = append(flags, given{name: def.name, value: value})
+				}
+				continue
 			}
 			if def.arg && !hasValue {
 				if i+1 >= len(argv) {

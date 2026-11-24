@@ -84,3 +84,58 @@ func TestTheLogSaysTheWritingIsInsideTheProgram(t *testing.T) {
 		t.Errorf("the log does not say where the writing came from: %q", logged.String())
 	}
 }
+
+// A program that carries its settings is the same site in every folder: the
+// settings inside it come before the file in the folder it runs in.
+func TestTheSettingsInsideTheProgramComeBeforeTheWorkingFolder(t *testing.T) {
+	// arrange
+	working := t.TempDir()
+	write(t, filepath.Join(working, settingsName), "title: The Working One\n")
+	files := carried("title: The Inside One\nposts: posts\n", map[string]string{
+		"mine.md": "---\ndate: 2026-01-02\n---\n\n# Mine\n\n# Sentence\n\nA line.\n",
+	})
+	t.Chdir(working)
+	w := &work{cmd: &commandLine{name: "serve", given: map[string]bool{}}, bundled: files}
+
+	// act
+	set, err := w.settings()
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.file.Title != "The Inside One" {
+		t.Errorf("the title is %q, want the one inside the program", set.file.Title)
+	}
+	if set.from != "the settings inside the program" {
+		t.Errorf("the settings came from %q, want the ones inside the program", set.from)
+	}
+}
+
+// The settings that are named on the command line come first of all, so that
+// a writer can replace the settings of a bundle on purpose.
+func TestTheNamedSettingsComeBeforeTheOnesInsideTheProgram(t *testing.T) {
+	// arrange
+	named := filepath.Join(t.TempDir(), "mine.yml")
+	write(t, named, "title: The Named One\n")
+	files := carried("title: The Inside One\nposts: posts\n", map[string]string{
+		"mine.md": "---\ndate: 2026-01-02\n---\n\n# Mine\n\n# Sentence\n\nA line.\n",
+	})
+	t.Chdir(t.TempDir())
+	w := &work{
+		cmd: &commandLine{name: "serve", globals: globals{config: named},
+			given: map[string]bool{}},
+		bundled: files,
+	}
+
+	// act
+	set, err := w.settings()
+
+	// assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.file.Title != "The Named One" {
+		t.Errorf("the title is %q, want the one that was named", set.file.Title)
+	}
+}

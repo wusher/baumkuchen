@@ -171,7 +171,8 @@ func TestRunExitCodes(t *testing.T) {
 }
 
 // The settings come from the file that was named, then the one in the posts
-// folder, then the one in the working folder, then the ones in the code.
+// folder, then the one inside the program, then the one in the working
+// folder, then the ones in the code.
 func TestFindSettings(t *testing.T) {
 	// arrange
 	working := t.TempDir()
@@ -180,6 +181,9 @@ func TestFindSettings(t *testing.T) {
 	write(t, filepath.Join(working, settingsName), "title: The Working One\n")
 	write(t, filepath.Join(folder, settingsName), "title: The Folder One\n")
 	write(t, named, "title: The Named One\n")
+	inside := fstest.MapFS{
+		"content/baumkuchen.yml": &fstest.MapFile{Data: []byte("title: The Inside One\n")},
+	}
 	t.Chdir(working)
 
 	// act + assert
@@ -187,15 +191,19 @@ func TestFindSettings(t *testing.T) {
 		name     string
 		explicit string
 		folder   string
+		bundled  fs.FS
 		want     string
 	}{
-		{name: "the file that was named", explicit: named, folder: folder, want: "The Named One"},
-		{name: "the file in the posts folder", folder: folder, want: "The Folder One"},
+		{name: "the file that was named", explicit: named, folder: folder,
+			bundled: inside, want: "The Named One"},
+		{name: "the file in the posts folder", folder: folder,
+			bundled: inside, want: "The Folder One"},
+		{name: "the file inside the program", bundled: inside, want: "The Inside One"},
 		{name: "the file in the working folder", want: "The Working One"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			set, err := findSettings(c.explicit, c.folder, nil)
+			set, err := findSettings(c.explicit, c.folder, c.bundled)
 			if err != nil {
 				t.Fatal(err)
 			}

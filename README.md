@@ -632,6 +632,13 @@ It leaves with 1 when the writing holds an error, and 0 when it does not. With
 output and the log to the standard error, so a pipe gets the report and
 nothing else.
 
+A picture is looked for under `/media/`, in the images folder beside the
+posts. The name in the address is the name of the file: a query is left out,
+and the escapes of a URL are read back, so `/media/my%20pic.png` is looked for
+under `my pic.png`. A picture on another host is not looked for at all: it is
+not ours, and it is not in the folder. One picture is reported once for a
+post, however many depths point at it.
+
 ## The audit
 
 `scripts/audit.sh` gives one row per file — the words in each of the five

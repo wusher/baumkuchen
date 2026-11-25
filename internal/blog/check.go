@@ -3,6 +3,7 @@ package blog
 import (
 	"fmt"
 	"io/fs"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -167,25 +168,46 @@ func (s *Site) dateFindings(p *Post) []Finding {
 }
 
 // mediaRef finds the pictures a page points at.
-var mediaRef = regexp.MustCompile(`/media/([^"'\s)]+)`)
+//
+// The address must begin with /media/: a picture on another host is not ours
+// to look for, and the writing does not point at our images folder.
+var mediaRef = regexp.MustCompile(`(?:^|[\s"'=(])/media/([^"'\s)]+)`)
 
-// pictureName gives the name of the picture, without the placement at the end
-// of the path.
+// pictureName gives the name of the picture, as the file is named on disk.
 //
 // A path may end in #left, #right or #center, which says where the picture
-// sits on the page. It is not part of the name of the file.
+// sits on the page. It is not part of the name of the file. A query after the
+// name asks for the same picture again, and says nothing about the file. The
+// escapes of a URL are read back, so a picture whose name holds a space is
+// looked for under the name it has on disk.
 func pictureName(path string) string {
 	name, _, _ := strings.Cut(path, "#")
+	name, _, _ = strings.Cut(name, "?")
+	if unescaped, err := url.PathUnescape(name); err == nil {
+		return unescaped
+	}
 	return name
 }
 
 // pictureFindings says which pictures the posts point at that are not there.
+//
+// One picture is reported once for a post, however many depths point at it:
+// the writing is wrong in one place, however many times it shows.
 func (s *Site) pictureFindings() []Finding {
 	var out []Finding
+	seen := map[string]bool{}
 	for _, p := range s.store.Index() {
 		for _, level := range p.Levels {
-			for _, name := range mediaRef.FindAllStringSubmatch(string(level.HTML), -1) {
-				out = append(out, s.pictureFinding(p, pictureName(name[1]))...)
+			for _, m := range mediaRef.FindAllStringSubmatch(string(level.HTML), -1) {
+				name := pictureName(m[1])
+				key := p.Slug + "\x00" + name
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				if f := s.pictureFinding(p, name); f != nil {
+					out = append(out, *f)
+				}
 			}
 		}
 	}
@@ -193,15 +215,17 @@ func (s *Site) pictureFindings() []Finding {
 }
 
 // pictureFinding says what is wrong with one picture, if anything.
-func (s *Site) pictureFinding(p *Post, name string) []Finding {
+//
+// It gives nothing back when the picture is there.
+func (s *Site) pictureFinding(p *Post, name string) *Finding {
 	if _, err := fs.Stat(s.media, name); err == nil {
 		return nil
 	}
-	return []Finding{{
+	return &Finding{
 		Level:   LevelError,
 		Kind:    KindMissingPicture,
 		Slug:    p.Slug,
 		File:    p.File,
 		Message: fmt.Sprintf("the picture %s is not in the images folder", name),
-	}}
+	}
 }

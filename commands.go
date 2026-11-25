@@ -134,10 +134,17 @@ func (w *work) settings() (*settings, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"title", "heading", "favicon", "base"} {
+	for _, name := range []string{"title", "heading", "base"} {
 		if v, ok := w.cmd.text(name); ok {
 			set.file.Set(name, v)
 		}
+	}
+	// the picture on the tab is told apart by where it was named: a path on
+	// the command line starts in the working folder, and a path in the
+	// settings file starts in the folder the settings file is in
+	if v, ok := w.cmd.text("favicon"); ok {
+		set.file.Set("favicon", v)
+		set.faviconFlag = true
 	}
 	w.set = set
 	return set, nil
@@ -267,6 +274,13 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 	if err != nil {
 		return nil, err
 	}
+	bundled, err := w.bundledContent()
+	if err != nil {
+		return nil, err
+	}
+	// the picture on the tab is read from where it was named: the folder of
+	// the settings file, the working folder, or the inside of the program
+	icon, iconName := set.favicon(bundled)
 	w.say("the settings come from %s", set.from)
 	w.say("the posts come from %s", src.Label())
 	return blog.New(blog.Config{
@@ -276,8 +290,8 @@ func (w *work) site(drafts bool) (*blog.Site, error) {
 		Base:          set.file.Base,
 		Title:         set.file.Title,
 		Heading:       set.file.Heading,
-		Favicon:       set.file.Favicon,
-		FaviconInside: set.inside,
+		Favicon:       iconName,
+		FaviconSource: icon,
 		LiveReload:    w.watching(),
 		DevFiles:      w.dev(),
 		HideDrafts:    !drafts,
@@ -558,7 +572,7 @@ func (w *work) bundle() error {
 	}
 	extra := map[string][]byte{bundle.Root + "/" + settingsName: set.bytes}
 	// the picture on the tab travels inside the program as well
-	icon, iconName, err := bundleIcon(set)
+	icon, iconName, err := w.bundleIcon(set)
 	if err != nil {
 		return err
 	}
@@ -581,16 +595,17 @@ func (w *work) bundle() error {
 // bundleIcon gives the picture on the tab, and the name it has inside the
 // program.
 //
-// The settings name a file on the disk of the writer. A bundle travels, so
+// The settings name a picture on the disk of the writer, or one that is
+// inside the program when the settings are inside it. A bundle travels, so
 // the picture travels with it: it is put inside, and the settings that go
 // inside are changed to name the picture that is there.
 //
-// The file is looked for the way the program looks for it — a relative path
-// starts in the working folder — and then beside the settings file.
+// The picture is read from where it was named: the folder of the settings
+// file, the working folder, or the inside of the program.
 //
 // A picture that is not there is a mistake, and it is named.
-func bundleIcon(set *settings) ([]byte, string, error) {
-	name := set.file.Favicon
+func (w *work) bundleIcon(set *settings) ([]byte, string, error) {
+	source, name := set.favicon(w.bundled)
 	if name == "" {
 		return nil, "", nil
 	}
@@ -598,12 +613,12 @@ func bundleIcon(set *settings) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	data, err := os.ReadFile(name)
+	if source == nil {
+		return nil, "", fmt.Errorf("the favicon %s is not there", name)
+	}
+	data, err := source.Read(name)
 	if err != nil {
-		data, err = os.ReadFile(set.resolve(name))
-		if err != nil {
-			return nil, "", fmt.Errorf("the favicon %s is not there: %w", name, err)
-		}
+		return nil, "", fmt.Errorf("the favicon %s is not there: %w", name, err)
 	}
 	return data, inside, nil
 }

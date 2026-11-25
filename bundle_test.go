@@ -194,7 +194,7 @@ func TestTheBundleCarriesThePictureOnTheTab(t *testing.T) {
 		Templates:     fs.FS(templateFiles),
 		Static:        fs.FS(staticFiles),
 		Favicon:       "favicon.svg",
-		FaviconInside: true,
+		FaviconSource: content.NewFS(files, bundle.Root),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -108,8 +108,9 @@ the writing, the templates, the stylesheet and the settings are all in it.
 
 The picture on the tab travels with it. A `favicon:` line in the settings
 names a file on the disk of the writer, so that file is put inside the program
-and the settings inside name it there. A picture that is not there stops the
-bundle and is named.
+and the settings inside name it there. The program reads the picture from
+inside itself, and not from the disk of the machine it runs on. A picture
+that is not there stops the bundle and is named.
 
 ## Install
 
@@ -217,7 +218,10 @@ purpose.
 
 Put `favicon.svg` beside your Markdown posts to set the browser icon. To use a
 different SVG, PNG, or ICO file, pass `--favicon PATH` or set `favicon: PATH` in
-`baumkuchen.yml`. Relative override paths start in the working directory. The
+`baumkuchen.yml`. A path in the settings file starts in the folder the
+settings file is in, so the settings file and the picture travel together and
+the file works wherever it is kept. A path on the command line starts in the
+working directory, which is where the command line was written. The
 server and static export both use the same icon. If no icon is set and the
 posts folder has no `favicon.svg`, the built-in half-circle icon remains.
 

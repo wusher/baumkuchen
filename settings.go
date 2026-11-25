@@ -8,6 +8,7 @@ import (
 
 	"github.com/wusher/baumkuchen/internal/blog"
 	"github.com/wusher/baumkuchen/internal/bundle"
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 // The name of the settings file.
@@ -32,6 +33,64 @@ type settings struct {
 	// is a path inside the program, and not a path on the disk of the
 	// machine the program runs on.
 	inside bool
+	// faviconFlag says the picture on the tab was named on the command line,
+	// and not in the settings file. The two are read from different places:
+	// a path in the settings file starts in the folder the settings file is
+	// in, and a path on the command line starts in the working folder.
+	faviconFlag bool
+}
+
+// favicon gives the picture on the tab: the source it is read from, and the
+// name it has there.
+//
+// A picture that is not named is not given: the picture in the writing is
+// used then, and there is no source to name.
+//
+// A picture named in the settings file is read from the folder the settings
+// file is in, so that the settings file and the picture travel together and
+// the file works wherever it is kept. A picture named on the command line is
+// read from the working folder, which is where the command line was written.
+//
+// The settings inside the program name a picture that is inside the program:
+// the picture travels with the program, and it is read from the files the
+// program carries and not from the disk of the machine it runs on.
+func (s *settings) favicon(bundled fs.FS) (content.Source, string) {
+	name := s.file.Favicon
+	if name == "" {
+		return nil, ""
+	}
+	if s.inside && !s.faviconFlag {
+		if bundled == nil {
+			return nil, name
+		}
+		return content.NewFS(bundled, bundle.Root), name
+	}
+	folder, name := faviconPlace(s.faviconFolder(), name)
+	return content.NewDir(folder), name
+}
+
+// faviconFolder gives the folder a relative path of the picture on the tab
+// starts in: the folder the settings file is in, or the working folder when
+// the picture was named on the command line.
+func (s *settings) faviconFolder() string {
+	if s.faviconFlag {
+		return "."
+	}
+	return s.dir
+}
+
+// faviconPlace gives the folder the picture on the tab is read from, and the
+// name it has there.
+//
+// A path that is absolute names a file on the disk of the machine: the
+// folder that holds it is the one it is in, and the name is the last part of
+// the path. A path that is relative starts in the folder that is given, and
+// keeps the rest of the path.
+func faviconPlace(folder, path string) (string, string) {
+	if filepath.IsAbs(path) {
+		return filepath.Dir(path), filepath.Base(path)
+	}
+	return folder, path
 }
 
 // names says whether the settings file wrote this setting down, rather than

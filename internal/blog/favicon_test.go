@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wusher/baumkuchen/internal/content"
 )
 
 func TestFaviconServedAndExported(t *testing.T) {
@@ -16,17 +18,20 @@ func TestFaviconServedAndExported(t *testing.T) {
 	const png = "\x89PNG\r\n\x1a\nexample"
 	posts := t.TempDir()
 	write(t, posts, "favicon.svg", svg)
-	custom := write(t, t.TempDir(), "custom.PNG", png)
+	custom := t.TempDir()
+	write(t, custom, "custom.PNG", png)
 	root := os.DirFS("../..")
 	for _, c := range []struct {
 		name, file, route, mediaType, data string
+		source                             content.Source
 	}{
-		{"discovered", "", "/favicon.svg", "image/svg+xml", svg},
-		{"override", custom, "/favicon.png", "image/png", png},
+		{"discovered", "", "/favicon.svg", "image/svg+xml", svg, nil},
+		{"override", "custom.PNG", "/favicon.png", "image/png", png, content.NewDir(custom)},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			site, err := New(Config{Posts: posts, Templates: root, Static: root,
-				Base: "/blog", Heading: "Read deeper", Favicon: c.file})
+				Base: "/blog", Heading: "Read deeper",
+				Favicon: c.file, FaviconSource: c.source})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -73,7 +78,8 @@ func TestFaviconFallbackAndBadOverride(t *testing.T) {
 	}
 
 	root := os.DirFS("../..")
-	_, err := New(Config{Posts: posts, Templates: root, Static: root, Favicon: filepath.Join(posts, "missing.png")})
+	_, err := New(Config{Posts: posts, Templates: root, Static: root,
+		Favicon: "missing.png", FaviconSource: content.NewDir(posts)})
 	if !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("missing explicit favicon: got %v, want a missing-file error", err)
 	}
@@ -85,11 +91,13 @@ func TestFaviconFallbackAndBadOverride(t *testing.T) {
 func TestFaviconRefusesBytesThatAreNotThePicture(t *testing.T) {
 	// arrange
 	posts := t.TempDir()
-	notAPng := write(t, t.TempDir(), "secret.png", "-----BEGIN OPENSSH PRIVATE KEY-----")
+	notAPng := t.TempDir()
+	write(t, notAPng, "secret.png", "-----BEGIN OPENSSH PRIVATE KEY-----")
 	root := os.DirFS("../..")
 
 	// act
-	_, err := New(Config{Posts: posts, Templates: root, Static: root, Favicon: notAPng})
+	_, err := New(Config{Posts: posts, Templates: root, Static: root,
+		Favicon: "secret.png", FaviconSource: content.NewDir(notAPng)})
 
 	// assert
 	if err == nil || !strings.Contains(err.Error(), "does not read as a png") {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,13 +51,16 @@ func faviconType(ext string) string {
 // loadFavicon reads the picture on the tab.
 //
 // The picture is named by the settings. A name that is not there names a
-// file on the disk of the machine the program runs on. A program that
-// carries its settings carries the picture with it, and the name is read
-// inside the program.
+// file in the writing: favicon.svg beside the posts, if it is there.
+//
+// A name that is there is read from the source given for it: a folder on
+// the disk of the machine the program runs on, or the files carried inside
+// the program. A program that carries its settings carries the picture with
+// it, and the name is read inside the program.
 //
 // With no name at all, the picture in the writing is used: favicon.svg
 // beside the posts, if it is there.
-func loadFavicon(src content.Source, file string, inside bool) (favicon, error) {
+func loadFavicon(src content.Source, icon content.Source, file string) (favicon, error) {
 	if file == "" {
 		data, err := src.Read(defaultFavicon)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -78,18 +80,13 @@ func loadFavicon(src content.Source, file string, inside bool) (favicon, error) 
 		return favicon{}, err
 	}
 	ext := filepath.Ext(name)
-	var data []byte
-	if inside {
-		// the picture travels inside the program, and is read from there
-		data, err = src.Read(file)
-		if err != nil {
-			return favicon{}, fmt.Errorf("read the favicon %s from inside the program: %w", file, err)
-		}
-	} else {
-		data, err = os.ReadFile(file)
-		if err != nil {
-			return favicon{}, fmt.Errorf("read favicon: %w", err)
-		}
+	if icon == nil {
+		// no place of its own was given: the picture is in the writing
+		icon = src
+	}
+	data, err := icon.Read(file)
+	if err != nil {
+		return favicon{}, fmt.Errorf("read the favicon %s from %s: %w", file, icon.Label(), err)
 	}
 	// The bytes must be the picture the name promises. The favicon is served
 	// and exported as it is, so a settings file that named some other kind of

@@ -311,6 +311,48 @@ second=$(wc -c < "$work/self")
   || fail "the bundle over the program did not build the site: $(cat "$work/self-build.log")"
 [ -f "$work/away/site-self/post/hello/index.html" ] || fail "the bundle over the program did not write the post"
 
+# ---- the picture on the tab comes from the folder of the settings file ----
+# A site whose settings name a picture beside them. The program is run from a
+# folder that holds no picture at all: the settings file and the picture
+# travel together, so the picture is found all the same.
+mkdir -p "$work/with-icon"
+cp -R "$work/posts" "$work/with-icon/posts"
+printf 'title: The Icon\nfavicon: ./icon.png\nposts: posts\n' > "$work/with-icon/baumkuchen.yml"
+printf '\211PNG\r\n\032\nthe picture of the settings file' > "$work/with-icon/icon.png"
+( cd "$work/away" && "$binary" build --config "$work/with-icon/baumkuchen.yml" \
+    --out "$work/site-icon" ) >"$work/icon.log" 2>&1 \
+  || fail "the build with a picture beside the settings did not finish: $(cat "$work/icon.log")"
+[ -f "$work/site-icon/favicon.png" ] || fail "the built site holds no picture on the tab"
+grep -q 'the picture of the settings file' "$work/site-icon/favicon.png" \
+  || fail "the picture on the tab is not the one beside the settings file"
+
+# ---- the picture named on the command line comes from the working folder ----
+# The settings name a picture of their own, and the flag names another one:
+# the flag wins, and the picture it names is read from the folder the command
+# line was written in.
+printf '\211PNG\r\n\032\nthe picture of the working folder' > "$work/away/other.png"
+( cd "$work/away" && "$binary" build --config "$work/with-icon/baumkuchen.yml" \
+    --favicon ./other.png --out "$work/site-flag" ) >"$work/flag.log" 2>&1 \
+  || fail "the build with a picture on the command line did not finish: $(cat "$work/flag.log")"
+grep -q 'the picture of the working folder' "$work/site-flag/favicon.png" \
+  || fail "the picture on the tab is not the one of the working folder"
+
+# ---- the bundle carries the picture on the tab, and reads it from inside ----
+# The bundle is made from the site whose settings name a picture beside them.
+# It is then run in a folder that holds a picture of the same name: the
+# picture inside the program is the one that is used, and not the one on the
+# disk of the machine it runs on.
+( cd "$work/away" && "$binary" bundle "$work/with-icon" -o "$work/bundle-icon" ) \
+  >"$work/bundle-icon.log" 2>&1 \
+  || fail "the bundle with a picture did not build: $(cat "$work/bundle-icon.log")"
+[ -x "$work/bundle-icon" ] || fail "the bundle with a picture is not there"
+printf '\211PNG\r\n\032\nthe picture of the working folder' > "$work/away/favicon.png"
+( cd "$work/away" && "$work/bundle-icon" build --out "$work/site-bundle-icon" ) \
+  >"$work/bundle-icon-build.log" 2>&1 \
+  || fail "the bundle with a picture did not build the site: $(cat "$work/bundle-icon-build.log")"
+grep -q 'the picture of the settings file' "$work/site-bundle-icon/favicon.png" \
+  || fail "the picture on the tab is not the one inside the bundle"
+
 # ---- a program with no posts says so, and names the ways to give it some ----
 if ( cd "$work/away" && "$binary" build --out "$work/away/site3" ) >"$work/noposts.log" 2>&1; then
   fail "a program with no posts must not build a site"
@@ -370,3 +412,5 @@ code=0
 echo "smoke: the program stands on its own: the static site, the live server,"
 echo "smoke: the pictures, the change after the start, the browser told about"
 echo "smoke: it, the drafts and the bundle all work."
+echo "smoke: the picture on the tab comes from the settings, from the command"
+echo "smoke: line, or from inside the bundle."
